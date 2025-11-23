@@ -104,3 +104,4 @@ urlpatterns = [
     path('api/assign-products-to-container/', views.assign_products_to_container, name='assign_products_to_container'),
 
 ]
+
