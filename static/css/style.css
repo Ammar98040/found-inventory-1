@@ -5,23 +5,24 @@
 }
 
 :root {
-    --primary-color: #2563eb;
-    --secondary-color: #64748b;
+    --primary-color: #4f46e5;
+    --secondary-color: #0ea5e9;
     --success-color: #10b981;
     --error-color: #ef4444;
     --warning-color: #f59e0b;
-    --bg-color: #f8fafc;
+    --bg-color: #f3f4f6;
     --card-bg: #ffffff;
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --border-color: #e2e8f0;
-    --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #e5e7eb;
+    --radius: 12px;
+    --shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+    --shadow-lg: 0 12px 24px rgba(15, 23, 42, 0.12);
 }
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: var(--bg-color);
+    background: linear-gradient(180deg, #f7fafc 0%, #f3f4f6 100%);
     color: var(--text-primary);
     line-height: 1.6;
     padding: 20px;
@@ -59,7 +60,7 @@ header h1 {
 .input-section {
     background: var(--card-bg);
     padding: 30px;
-    border-radius: 12px;
+    border-radius: var(--radius);
     box-shadow: var(--shadow-lg);
 }
 
@@ -74,11 +75,11 @@ header h1 {
     color: var(--text-primary);
 }
 
-.input-group textarea {
+.input-group textarea, .search-box input, input.field {
     width: 100%;
     padding: 15px;
     border: 2px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: var(--radius);
     font-size: 1rem;
     font-family: inherit;
     resize: vertical;
@@ -99,37 +100,36 @@ header h1 {
 
 /* الأزرار */
 .btn {
-    padding: 12px 24px;
+    padding: 12px 20px;
     font-size: 1rem;
     font-weight: 600;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius);
     cursor: pointer;
-    transition: all 0.3s;
+    transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease;
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    margin-left: 10px;
 }
 
 .btn-primary {
-    background: var(--primary-color);
+    background: linear-gradient(135deg, #4f46e5 0%, #0ea5e9 100%);
     color: white;
+    box-shadow: var(--shadow);
 }
 
 .btn-primary:hover {
-    background: #1d4ed8;
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     box-shadow: var(--shadow-lg);
 }
 
 .btn-secondary {
-    background: var(--secondary-color);
-    color: white;
+    background: #e5e7eb;
+    color: #0f172a;
 }
 
 .btn-secondary:hover {
-    background: #475569;
+    background: #d1d5db;
 }
 
 .btn-icon {
@@ -145,7 +145,7 @@ header h1 {
 .results-section {
     background: var(--card-bg);
     padding: 20px;
-    border-radius: 12px;
+    border-radius: var(--radius);
     box-shadow: var(--shadow-lg);
 }
 
@@ -179,18 +179,18 @@ header h1 {
 }
 
 .product-card {
-    background: var(--bg-color);
-    padding: 10px;
-    border-radius: 8px;
-    border: 2px solid var(--border-color);
-    transition: all 0.3s;
-    font-size: 0.85rem;
+    background: #ffffff;
+    padding: 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-color);
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    font-size: 0.9rem;
 }
 
 .product-card:hover {
-    border-color: var(--primary-color);
+    border-color: #cbd5e1;
     box-shadow: var(--shadow);
-    transform: translateY(-2px);
+    transform: translateY(-1px);
 }
 
 .product-card.not-found {
@@ -253,14 +253,14 @@ header h1 {
 
 .location-item {
     background: white;
-    padding: 6px 10px;
-    margin-bottom: 5px;
-    border-radius: 4px;
-    border-right: 3px solid var(--primary-color);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: var(--radius);
+    border-right: 4px solid var(--primary-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
 }
 
 .location-info {

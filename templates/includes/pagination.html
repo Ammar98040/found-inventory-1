@@ -1,0 +1,32 @@
+{% if page_obj.has_other_pages %}
+<div class="pagination">
+    {% if page_obj.has_previous %}
+        <a href="?page=1{% if search %}&search={{ search }}{% endif %}{% if action_filter %}&action={{ action_filter }}{% endif %}" class="pagination-link">
+            « الأولى
+        </a>
+        <a href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if action_filter %}&action={{ action_filter }}{% endif %}" class="pagination-link">
+            السابقة
+        </a>
+    {% else %}
+        <span class="pagination-link disabled">« الأولى</span>
+        <span class="pagination-link disabled">السابقة</span>
+    {% endif %}
+    
+    <span class="current">
+        صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}
+    </span>
+    
+    {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if action_filter %}&action={{ action_filter }}{% endif %}" class="pagination-link">
+            التالية
+        </a>
+        <a href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if action_filter %}&action={{ action_filter }}{% endif %}" class="pagination-link">
+            الأخيرة »
+        </a>
+    {% else %}
+        <span class="pagination-link disabled">التالية</span>
+        <span class="pagination-link disabled">الأخيرة »</span>
+    {% endif %}
+</div>
+{% endif %}
+

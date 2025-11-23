@@ -94,13 +94,20 @@
             margin-bottom: 10px;
             display: block;
         }
+        .low-stock-row { background: #fff5f5; }
+        .badge-critical { background: #ff6b6b; }
+        .badge-low { background: #f59e0b; }
+        .badge-warn { background: #fbbf24; }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>📊 لوحة التحكم</h1>
+            
         </header>
+
+        
 
         <!-- إحصائيات -->
         <div class="dashboard-grid">
@@ -137,6 +144,45 @@
                 <div class="stat-label">السعة الكلية</div>
                 <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">
                     موقع
+                </div>
+            </div>
+        </div>
+
+        <!-- إحصائيات إضافية -->
+        <div class="dashboard-grid" style="margin-top: 20px;">
+            <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="stat-icon">📦</div>
+                <div class="stat-number">{{ containers_count }}</div>
+                <div class="stat-label">الحاويات</div>
+                <a href="/containers/" style="color: white; text-decoration: underline; display: inline-block; margin-top: 10px;">
+                    إدارة الحاويات →
+                </a>
+            </div>
+
+            <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="stat-icon">📋</div>
+                <div class="stat-number">{{ orders_count }}</div>
+                <div class="stat-label">الطلبات المسحوبة</div>
+                <a href="/orders/" style="color: white; text-decoration: underline; display: inline-block; margin-top: 10px;">
+                    عرض الطلبات →
+                </a>
+            </div>
+
+            <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="stat-icon">↩️</div>
+                <div class="stat-number">{{ returns_count }}</div>
+                <div class="stat-label">المرتجعات</div>
+                <a href="/returns/" style="color: white; text-decoration: underline; display: inline-block; margin-top: 10px;">
+                    عرض المرتجعات →
+                </a>
+            </div>
+
+            <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <div class="stat-icon">📊</div>
+                <div class="stat-number">{{ total_quantity|floatformat:0 }}</div>
+                <div class="stat-label">إجمالي الكمية</div>
+                <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">
+                    حبة في المخزون
                 </div>
             </div>
         </div>
@@ -185,15 +231,42 @@
                     </p>
                 </a>
 
-                <a href="/daily-reports/" class="action-btn" style="border-color: #667eea;">
-                    <span class="action-icon">📊</span>
-                    <strong>التقارير اليومية</strong>
+                
+
+                <a href="/containers/" class="action-btn" style="border-color: #667eea;">
+                    <span class="action-icon">📦</span>
+                    <strong>إدارة الحاويات</strong>
                     <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
-                        تقارير سريعة عن اليوم
+                        تنظيم المنتجات في حاويات
+                    </p>
+                </a>
+
+                <a href="/orders/" class="action-btn">
+                    <span class="action-icon">📋</span>
+                    <strong>الطلبات المسحوبة</strong>
+                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
+                        عرض جميع الطلبات
+                    </p>
+                </a>
+
+                <a href="/returns/" class="action-btn">
+                    <span class="action-icon">↩️</span>
+                    <strong>المرتجعات</strong>
+                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
+                        إدارة المرتجعات
+                    </p>
+                </a>
+                <a href="/inventory-insights/" class="action-btn">
+                    <span class="action-icon">📦</span>
+                    <strong>توصيات المخزون</strong>
+                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
+                        إعادة الطلب والتوازن بدقة
                     </p>
                 </a>
             </div>
         </div>
+
+        
 
         <!-- معلومات المستودع -->
         <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: var(--shadow-lg); margin-top: 30px;">
@@ -304,17 +377,7 @@
                 </a>
             </div>
             
-            <div class="sidebar-section">
-                <div class="sidebar-title">التقارير</div>
-                <a href="/daily-reports/" class="sidebar-link">
-                    <span class="icon">📊</span>
-                    <span class="text">التقارير اليومية</span>
-                </a>
-                <a href="/daily-reports-archive/" class="sidebar-link">
-                    <span class="icon">📚</span>
-                    <span class="text">سجل التقارير</span>
-                </a>
-            </div>
+            
             
             <div class="sidebar-section">
                 <div class="sidebar-title">الصيانة</div>
@@ -475,6 +538,14 @@
                     }
                 }
             });
+        });
+        document.querySelectorAll('.container-badge').forEach(function(el){
+            var color = el.getAttribute('data-color');
+            if (color) {
+                el.style.color = color;
+                el.style.backgroundColor = color + '20';
+                el.style.border = '1px solid ' + color + '40';
+            }
         });
     </script>
 </body>

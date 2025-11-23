@@ -5,8 +5,8 @@
     right: -320px;
     width: 320px;
     height: 100vh;
-    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+    box-shadow: -4px 0 24px rgba(15, 23, 42, 0.4);
     z-index: 9998;
     transition: right 0.3s ease;
     overflow-y: auto;
@@ -22,24 +22,24 @@
     position: fixed;
     top: 20px;
     right: 20px;
-    width: 50px;
-    height: 50px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #4f46e5 0%, #0ea5e9 100%);
     border: none;
-    border-radius: 12px;
+    border-radius: 14px;
     cursor: pointer;
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s;
+    font-size: 22px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.35);
+    transition: transform .2s ease, box-shadow .2s ease;
 }
 
 #sidebar-toggle:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.45);
 }
 
 #sidebar-toggle:active {
@@ -112,12 +112,12 @@
 #sidebar-search-input {
     width: 100%;
     padding: 12px 15px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
     color: white;
     font-size: 0.95rem;
-    transition: all 0.3s;
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
 }
 
 #sidebar-search-input::placeholder {
@@ -126,9 +126,9 @@
 
 #sidebar-search-input:focus {
     outline: none;
-    border-color: #667eea;
-    background: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+    border-color: #4f46e5;
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.35);
 }
 
 /* نتائج البحث */
@@ -139,9 +139,9 @@
     right: 20px;
     max-height: 300px;
     overflow-y: auto;
-    background: rgba(15, 23, 42, 0.95);
-    border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    background: rgba(17, 24, 39, 0.96);
+    border-radius: 12px;
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.5);
     z-index: 10000;
     display: none;
 }
@@ -166,7 +166,7 @@
 }
 
 .search-result-item:hover {
-    background: rgba(102, 126, 234, 0.3);
+    background: rgba(79, 70, 229, 0.3);
 }
 
 .search-result-item .icon {

@@ -257,17 +257,7 @@
                 </a>
             </div>
             
-            <div class="sidebar-section">
-                <div class="sidebar-title">التقارير</div>
-                <a href="/daily-reports/" class="sidebar-link">
-                    <span class="icon">📊</span>
-                    <span class="text">التقارير اليومية</span>
-                </a>
-                <a href="/daily-reports-archive/" class="sidebar-link">
-                    <span class="icon">📚</span>
-                    <span class="text">سجل التقارير</span>
-                </a>
-            </div>
+            
             
             <div class="sidebar-section">
                 <div class="sidebar-title">الصيانة</div>
@@ -335,12 +325,7 @@
                         <span class="count">{{ stats.audit_logs }}</span>
                     </div>
                     
-                    <div class="checkbox-item" onclick="toggleCheckbox('delete_daily_reports')">
-                        <span class="icon">📊</span>
-                        <input type="checkbox" id="delete_daily_reports" name="delete_daily_reports">
-                        <label for="delete_daily_reports">حذف جميع التقارير اليومية</label>
-                        <span class="count">{{ stats.daily_reports }}</span>
-                    </div>
+                    
                     
                     <div class="checkbox-item" onclick="toggleCheckbox('delete_orders')">
                         <span class="icon">📋</span>
@@ -429,7 +414,7 @@
                 delete_warehouses: document.getElementById('delete_warehouses').checked,
                 delete_locations: document.getElementById('delete_locations').checked,
                 delete_audit_logs: document.getElementById('delete_audit_logs').checked,
-                delete_daily_reports: document.getElementById('delete_daily_reports').checked,
+                
                 delete_orders: document.getElementById('delete_orders').checked,
                 delete_returns: document.getElementById('delete_returns').checked,
                 delete_user_profiles: document.getElementById('delete_user_profiles').checked,
@@ -441,24 +426,32 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: JSON.stringify(data)
             })
-            .then(response => response.json())
+            .then(async (response) => {
+                const ct = response.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.error || 'فشل الطلب');
+                    }
+                    return result;
+                } else {
+                    const text = await response.text();
+                    throw new Error('الاستجابة ليست JSON. يرجى التأكد من تسجيل الدخول وامتلاك الصلاحيات اللازمة.');
+                }
+            })
             .then(result => {
                 closeModal();
-                
-                if (result.success) {
-                    alert('✅ ' + result.message);
-                    location.reload();
-                } else {
-                    alert('❌ ' + result.error);
-                }
+                alert('✅ ' + result.message);
+                location.reload();
             })
             .catch(error => {
                 closeModal();
-                alert('❌ حدث خطأ: ' + error);
+                alert('❌ ' + error.message);
             });
         }
         

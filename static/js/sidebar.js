@@ -144,6 +144,8 @@ function updateSidebarStats() {
                 emptyElement.textContent = data.empty_locations;
                 emptyElement.parentElement.parentElement.classList.remove('loading', 'error');
             }
+
+            
         })
         .catch(error => {
             console.error('خطأ في جلب الإحصائيات:', error);

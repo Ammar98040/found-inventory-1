@@ -1,6 +1,21 @@
 // متغيرات عامة
 let currentResults = [];
 
+/**
+ * دالة لتحليل الكمية من النص
+ * تدعم الصيغ التالية:
+ * - 1d أو 1 = درزن واحد (12 حبة)
+ * - 0.5d = نصف درزن (6 حبات)
+ * - 2d+5 = درزنان + 5 حبات (29 حبة)
+ * - 15 = 15 حبة مباشرة
+ */
+function parseQuantity(quantityStr) {
+    const str = (quantityStr || '').trim();
+    if (str === '') return 0;
+    const num = parseInt(str, 10);
+    return Number.isNaN(num) ? 0 : num;
+}
+
 // عناصر DOM
 const searchBtn = document.getElementById('search-btn');
 const clearBtn = document.getElementById('clear-btn');
@@ -12,6 +27,18 @@ const resultsCount = document.getElementById('results-count');
 const loadingEl = document.getElementById('loading');
 const errorMessage = document.getElementById('error-message');
 const warehouseView = document.getElementById('warehouse-view');
+const restoreBtn = document.getElementById('restore-btn');
+const autoSaveStatus = document.getElementById('auto-save-status');
+const lastSavedInfo = document.getElementById('last-saved-info');
+const lastSavedTime = document.getElementById('last-saved-time');
+
+// مفاتيح LocalStorage
+const STORAGE_KEY = 'inventory_product_numbers';
+const STORAGE_RECIPIENT_KEY = 'inventory_recipient_name';
+const STORAGE_TIMESTAMP_KEY = 'inventory_save_timestamp';
+
+// متغير للحفظ التلقائي
+let autoSaveTimeout = null;
 
 // استمع للأحداث
 searchBtn.addEventListener('click', handleSearch);
@@ -22,8 +49,39 @@ productNumbersTextarea.addEventListener('keydown', (e) => {
     }
 });
 
+// الحفظ التلقائي أثناء الكتابة
+productNumbersTextarea.addEventListener('input', () => {
+    clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = setTimeout(() => {
+        autoSaveData();
+    }, 1000); // حفظ بعد ثانية من التوقف عن الكتابة
+});
+
+// حفظ اسم المستلم أيضاً
+if (recipientNameInput) {
+    recipientNameInput.addEventListener('input', () => {
+        clearTimeout(autoSaveTimeout);
+        autoSaveTimeout = setTimeout(() => {
+            autoSaveData();
+        }, 1000);
+    });
+}
+
+// زر الاستعادة
+if (restoreBtn) {
+    restoreBtn.addEventListener('click', restoreData);
+}
+
+// استعادة البيانات عند تحميل الصفحة
+window.addEventListener('DOMContentLoaded', () => {
+    checkForSavedData();
+});
+
 // معالج البحث
 async function handleSearch() {
+    // حفظ البيانات قبل البحث (للأمان)
+    autoSaveData();
+    
     const input = productNumbersTextarea.value.trim();
     const recipientName = recipientNameInput ? recipientNameInput.value.trim() : '';
     
@@ -77,72 +135,65 @@ function parseSearchInput(input) {
     const products = [];
     const seenNumbers = new Set();
     const duplicates = [];
-    
+    const invalidLines = [];
+    const numericPattern = /^\d+(?::\d+)?$/;
+
     for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
-        
-        // استخراج رقم المنتج
+        if (!numericPattern.test(trimmed)) {
+            invalidLines.push(trimmed);
+            continue;
+        }
+
         let productNumber;
         if (trimmed.includes(':')) {
             const [productNum, quantityStr] = trimmed.split(':');
             productNumber = productNum.trim();
+            const quantity = parseQuantity(quantityStr.trim());
+            if (seenNumbers.has(productNumber)) {
+                duplicates.push(productNumber);
+                continue;
+            }
+            seenNumbers.add(productNumber);
+            products.push({ product_number: productNumber, quantity });
         } else {
             productNumber = trimmed;
-        }
-        
-        // التحقق من التكرار
-        if (seenNumbers.has(productNumber)) {
-            duplicates.push(productNumber);
-            continue;
-        }
-        
-        seenNumbers.add(productNumber);
-        
-        // فحص إذا كان يحتوي على : (نموذج: PRODUCT-001:10)
-        if (trimmed.includes(':')) {
-            const [productNum, quantityStr] = trimmed.split(':');
-            const quantity = parseInt(quantityStr.trim()) || 0;
-            products.push({
-                product_number: productNumber,
-                quantity: quantity
-            });
-        } else {
-            // بدون كمية
-            products.push({
-                product_number: productNumber,
-                quantity: 0
-            });
+            if (seenNumbers.has(productNumber)) {
+                duplicates.push(productNumber);
+                continue;
+            }
+            seenNumbers.add(productNumber);
+            products.push({ product_number: productNumber, quantity: 0 });
         }
     }
-    
-    // إظهار رسالة للأرقام المكررة
+
     if (duplicates.length > 0) {
         const uniqueDuplicates = [...new Set(duplicates)];
-        const message = `⚠️ يوجد أرقام منتج مكررة:\n${uniqueDuplicates.join('\n')}\n\nتم تجاهل التكرارات وسيتم البحث عن كل منتج مرة واحدة فقط.`;
-        
-        // إظهار تنبيه
-        alert(message);
-        
-        // إظهار رسالة في الواجهة
+        alert(`⚠️ يوجد أرقام منتج مكررة:\n${uniqueDuplicates.join('\n')}`);
         showWarning(uniqueDuplicates);
     }
-    
+
+    if (invalidLines.length > 0) {
+        alert(`❌ صيغة غير صحيحة، استخدم: رقم أو رقم:رقم فقط\nالأسطر غير الصالحة:\n${invalidLines.join('\n')}`);
+    }
+
     return { products };
 }
 
-// إظهار تحذير في الواجهة
+// إظهار تحذير في الواجهة (مُوحَّد)
 function showWarning(duplicates) {
-    const errorEl = document.getElementById('error-message');
-    if (errorEl) {
-        errorEl.className = 'alert alert-warning';
-        errorEl.style.display = 'block';
-        errorEl.innerHTML = `
-            <strong>⚠️ أرقام مكررة:</strong><br>
-            ${duplicates.map(num => `<code>${num}</code>`).join(', ')}<br>
-            <small>تم تجاهلها - سيظهر كل منتج مرة واحدة</small>
-        `;
-    }
+    const errorMessage = document.getElementById('error-message');
+    if (!errorMessage) return;
+    errorMessage.innerHTML = `<strong>⚠️ أرقام مكررة:</strong><br>${duplicates.map(num => `<code>${num}</code>`).join(', ')}<br><small>تم تجاهلها - سيظهر كل منتج مرة واحدة</small>`;
+    errorMessage.className = 'alert alert-warning';
+    errorMessage.style.display = 'block';
+    setTimeout(() => {
+        if (errorMessage.className.includes('alert-warning')) {
+            errorMessage.style.display = 'none';
+            errorMessage.textContent = '';
+        }
+    }, 5000);
 }
 
 // عرض النتائج
@@ -198,7 +249,7 @@ function createProductCard(product, index) {
                         </div>` : ''}
                     </div>
                     <div class="location-actions">
-                        <button onclick="highlightLocation(${location.column}, ${location.row})">
+                        <button onclick="highlightLocation(${location.row}, ${location.column})">
                             🔍 عرض على الخريطة
                         </button>
                     </div>
@@ -241,6 +292,29 @@ function createProductCard(product, index) {
         }
     }
     
+    let suggestionsHtml = '';
+    if (!product.found && product.suggestions && product.suggestions.length > 0) {
+        const csv = product.suggestions.map(s => s.product_number).join(',');
+        suggestionsHtml = '<div class="suggestions">'
+            + `<div style="display:flex; align-items:center; justify-content:space-between;">
+                <h4>🔎 اقتراحات مشابهة:</h4>
+                <button onclick="useAllSuggestions('${product.product_number}', '${csv}', ${product.requested_quantity || 0})" style="background:#334155; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem;">استخدام الكل</button>
+              </div>`
+            + '<ul style="list-style: none; padding: 0; margin: 8px 0;">';
+        product.suggestions.forEach(s => {
+            const numHtml = highlightMatch(s.product_number, product.product_number);
+            const nameHtml = s.name ? highlightMatch(s.name, product.product_number) : '';
+            suggestionsHtml += `<li style="padding: 6px 8px; margin: 4px 0; background: #f8fafc; border-right: 3px solid #667eea; border-radius: 6px; color: #334155; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <div>
+                    <strong>${numHtml}</strong> ${nameHtml ? `- ${nameHtml}` : ''}
+                    <span style="color:#64748b; font-size: 0.85rem;"> | الكمية: ${s.quantity}</span>
+                </div>
+                <button onclick="useSuggestion('${product.product_number}', '${s.product_number}', ${product.requested_quantity || 0})" style="background:#667eea; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:0.85rem;">استخدام</button>
+            </li>`;
+        });
+        suggestionsHtml += '</ul></div>';
+    }
+
     card.innerHTML = `
         <div class="product-header">
             <div class="product-info" style="display: flex; align-items: center; gap: 10px; flex: 1;">
@@ -264,6 +338,7 @@ function createProductCard(product, index) {
         ${quantityInfo}
         ${locationsHtml}
         ${!product.found ? `<p style="color: var(--error-color); margin-top: 10px; font-size: 0.85rem;">${product.error || 'لم يتم العثور على هذا المنتج'}</p>` : ''}
+        ${!product.found ? suggestionsHtml : ''}
     `;
     
     // إضافة تأثير الظهور
@@ -272,6 +347,98 @@ function createProductCard(product, index) {
     }, index * 50);
     
     return card;
+}
+
+function useSuggestion(originalNumber, suggestedNumber, requestedQty) {
+    const current = productNumbersTextarea.value || '';
+    let lines = current.trim() ? current.split('\n') : [];
+    const hasSuggested = lines.some(line => (line.trim().split(':')[0]) === suggestedNumber);
+    let replaced = false;
+    lines = lines.map(line => {
+        const parts = line.trim().split(':');
+        const num = (parts[0] || '').trim();
+        if (num === originalNumber) {
+            replaced = true;
+            if (hasSuggested) {
+                return null;
+            }
+            if (requestedQty && Number(requestedQty) > 0) {
+                return `${suggestedNumber}:${requestedQty}`;
+            }
+            return `${suggestedNumber}`;
+        }
+        return line;
+    }).filter(Boolean);
+    if (!replaced && !hasSuggested) {
+        if (requestedQty && Number(requestedQty) > 0) {
+            lines.push(`${suggestedNumber}:${requestedQty}`);
+        } else {
+            lines.push(`${suggestedNumber}`);
+        }
+    }
+    productNumbersTextarea.value = lines.join('\n');
+    autoSaveData();
+    handleSearch();
+}
+
+function useAllSuggestions(originalNumber, csvNumbers, requestedQty) {
+    const list = (csvNumbers || '').split(',').map(s => s.trim()).filter(Boolean);
+    const current = productNumbersTextarea.value || '';
+    let lines = current.trim() ? current.split('\n') : [];
+    let replaced = false;
+    lines = lines.map(line => {
+        const parts = line.trim().split(':');
+        const num = (parts[0] || '').trim();
+        if (num === originalNumber) {
+            replaced = true;
+            const first = list[0];
+            if (!first) return null;
+            const already = lines.some(l => (l.trim().split(':')[0]) === first);
+            if (already) return null;
+            if (requestedQty && Number(requestedQty) > 0) {
+                return `${first}:${requestedQty}`;
+            }
+            return `${first}`;
+        }
+        return line;
+    }).filter(Boolean);
+    for (let i = 1; i < list.length; i++) {
+        const num = list[i];
+        const exists = lines.some(l => (l.trim().split(':')[0]) === num);
+        if (!exists) {
+            if (requestedQty && Number(requestedQty) > 0) {
+                lines.push(`${num}:${requestedQty}`);
+            } else {
+                lines.push(`${num}`);
+            }
+        }
+    }
+    if (!replaced && list.length > 0) {
+        const first = list[0];
+        const exists = lines.some(l => (l.trim().split(':')[0]) === first);
+        if (!exists) {
+            if (requestedQty && Number(requestedQty) > 0) {
+                lines.push(`${first}:${requestedQty}`);
+            } else {
+                lines.push(`${first}`);
+            }
+        }
+    }
+    productNumbersTextarea.value = lines.join('\n');
+    autoSaveData();
+    handleSearch();
+}
+
+function highlightMatch(text, query) {
+    const t = String(text || '');
+    const q = String(query || '');
+    if (!t || !q) return t;
+    const idx = t.toLowerCase().indexOf(q.toLowerCase());
+    if (idx === -1) return t;
+    const before = t.slice(0, idx);
+    const mid = t.slice(idx, idx + q.length);
+    const after = t.slice(idx + q.length);
+    return `${before}<mark style="background:#fde68a; color:#111827;">${mid}</mark>${after}`;
 }
 
 // تحديث عدد النتائج
@@ -361,6 +528,8 @@ async function drawWarehouse(results) {
         headerCell.style.cssText = `width: ${cellSize}; height: ${headerCellHeight}; background: #667eea; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 1px solid #5568d3; font-size: ${fontSize}; flex-shrink: 0;`;
         headerCell.textContent = col;
         headerCell.classList.add('grid-header-cell');
+        headerCell.classList.add('grid-column-header');
+        headerCell.setAttribute('data-column', col);
         headerRow.appendChild(headerCell);
     }
     
@@ -377,6 +546,8 @@ async function drawWarehouse(results) {
         const rowHeader = document.createElement('div');
         rowHeader.style.cssText = `width: ${headerCellWidth}; height: ${cellSize}; background: #667eea; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 1px solid #5568d3; font-size: ${fontSize}; flex-shrink: 0;`;
         rowHeader.textContent = row;
+        rowHeader.classList.add('grid-row-header');
+        rowHeader.setAttribute('data-row', row);
         rowDiv.appendChild(rowHeader);
         
         // الخلايا
@@ -391,6 +562,10 @@ async function drawWarehouse(results) {
             // جعل جميع الخلايا بنفس الحجم والتصميم لمنع التداخل - دقة عالية
             cell.style.cssText = `width: ${cellSize}; height: ${cellSize}; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid #e2e8f0; flex-shrink: 0; position: relative; overflow: hidden;`;
             cell.classList.add('warehouse-grid-cell');
+            
+            // إضافة data attributes للتعرف الدقيق على الخلية
+            cell.setAttribute('data-row', row);
+            cell.setAttribute('data-column', col);
             
             const locationText = `R${row}C${col}`;
             
@@ -449,8 +624,8 @@ async function drawWarehouse(results) {
 // تم حذف دوال العرض البسيط - الآن نعرض الشبكة دائماً على جميع الأحجام بدقة عالية
 
 
-// تمييز موقع معين
-function highlightLocation(column, row) {
+// تمييز موقع معين - استخدام data attributes للدقة الكاملة
+function highlightLocation(row, column) {
     console.log('Highlighting location:', `R${row}C${column}`);
     const gridContainer = document.getElementById('warehouse-grid');
     
@@ -460,63 +635,109 @@ function highlightLocation(column, row) {
         return;
     }
     
-    // البحث عن الخلايا بشكل أفضل
-    const cells = gridContainer.querySelectorAll('.warehouse-grid-cell');
+    // البحث الدقيق باستخدام data attributes - لا يوجد أي احتمال للخطأ
+    const targetCell = gridContainer.querySelector(
+        `.warehouse-grid-cell[data-row="${row}"][data-column="${column}"]`
+    );
     
-    let found = false;
-    
-    cells.forEach((cell, index) => {
-        const cellText = cell.textContent || cell.innerHTML;
-        const cellTitle = cell.title || '';
-        
-        // البحث عن الموقع المطابق - استخدام row و column
-        if (cellText.includes(`R${row}C${column}`) || cellTitle.includes(`R${row}C${column}`)) {
-            found = true;
-            console.log('Found cell at index:', index);
-            
-            // حفظ الحالة الأصلية
-            const originalStyles = {
-                borderColor: cell.style.borderColor || getComputedStyle(cell).borderColor,
-                borderWidth: cell.style.borderWidth || getComputedStyle(cell).borderWidth,
-                boxShadow: cell.style.boxShadow || getComputedStyle(cell).boxShadow,
-                zIndex: cell.style.zIndex || getComputedStyle(cell).zIndex,
-                transform: cell.style.transform || getComputedStyle(cell).transform
-            };
-            
-            // تطبيق التأثير الاصفر بشكل مباشر
-            cell.style.cssText += 'border: 6px solid #fbbf24 !important; box-shadow: 0 0 25px rgba(251, 191, 36, 1) !important; z-index: 1000 !important; transform: scale(1.2) !important; transition: all 0.3s ease !important;';
-            
-            console.log('Applied highlight effect');
-            
-            // إعادة الحالة الأصلية بعد 3 ثواني
-            setTimeout(() => {
-                const bgColor = cell.style.background;
-                
-                if (bgColor && (bgColor.includes('#ef4444') || bgColor.includes('239, 68, 68'))) {
-                    // خلية تحتوي على منتج - لون أحمر
-                    cell.style.border = '3px solid #dc2626';
-                } else {
-                    // خلية فارغة
-                    cell.style.border = '2px solid #e2e8f0';
-                }
-                
-                cell.style.boxShadow = originalStyles.boxShadow;
-                cell.style.zIndex = '1';
-                cell.style.transform = 'scale(1)';
-                
-                console.log('Removed highlight effect');
-            }, 3000);
-            
-            // التمرير للموقع
-            setTimeout(() => {
-                cell.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-            }, 100);
-        }
-    });
-    
-    if (!found) {
+    if (!targetCell) {
         console.error('Cell not found for location:', `R${row}C${column}`);
+        alert(`لم يتم العثور على الموقع R${row}C${column}`);
+        return;
     }
+    
+    console.log('Found cell:', targetCell);
+    
+    // البحث عن row header و column header
+    const rowHeader = gridContainer.querySelector(`.grid-row-header[data-row="${row}"]`);
+    const columnHeader = gridContainer.querySelector(`.grid-column-header[data-column="${column}"]`);
+    
+    // حفظ الحالة الأصلية للخلية
+    const originalBorder = targetCell.style.border;
+    const originalBoxShadow = targetCell.style.boxShadow;
+    const originalZIndex = targetCell.style.zIndex;
+    const originalTransform = targetCell.style.transform;
+    
+    // حفظ الحالة الأصلية للـ headers
+    const originalRowHeaderBg = rowHeader ? rowHeader.style.background : null;
+    const originalRowHeaderBorder = rowHeader ? rowHeader.style.border : null;
+    const originalColHeaderBg = columnHeader ? columnHeader.style.background : null;
+    const originalColHeaderBorder = columnHeader ? columnHeader.style.border : null;
+    
+    // تطبيق التأثير البرتقالي على الخلية
+    targetCell.style.setProperty('border', '6px solid #f97316', 'important');
+    targetCell.style.setProperty('box-shadow', '0 0 25px rgba(249, 115, 22, 1)', 'important');
+    targetCell.style.setProperty('z-index', '1000', 'important');
+    targetCell.style.setProperty('transform', 'scale(1.2)', 'important');
+    targetCell.style.setProperty('transition', 'all 0.3s ease', 'important');
+    
+    // تطبيق التأثير البرتقالي على الـ headers
+    if (rowHeader) {
+        rowHeader.style.setProperty('background', '#f97316', 'important'); // برتقالي
+        rowHeader.style.setProperty('border', '3px solid #ea580c', 'important');
+        rowHeader.style.setProperty('transition', 'all 0.3s ease', 'important');
+        rowHeader.style.setProperty('box-shadow', '0 0 15px rgba(249, 115, 22, 0.5)', 'important');
+    }
+    
+    if (columnHeader) {
+        columnHeader.style.setProperty('background', '#f97316', 'important'); // برتقالي
+        columnHeader.style.setProperty('border', '3px solid #ea580c', 'important');
+        columnHeader.style.setProperty('transition', 'all 0.3s ease', 'important');
+        columnHeader.style.setProperty('box-shadow', '0 0 15px rgba(249, 115, 22, 0.5)', 'important');
+    }
+    
+    console.log('Applied highlight effect to cell and headers at R' + row + 'C' + column);
+    
+    // إعادة الحالة الأصلية بعد 3 ثواني
+    setTimeout(() => {
+        const bgColor = targetCell.style.background;
+        
+        // إعادة الخلية - إزالة !important
+        targetCell.style.removeProperty('border');
+        targetCell.style.removeProperty('box-shadow');
+        targetCell.style.removeProperty('z-index');
+        targetCell.style.removeProperty('transform');
+        targetCell.style.removeProperty('transition');
+        
+        // إعادة القيم الأصلية
+        if (bgColor && (bgColor.includes('#ef4444') || bgColor.includes('239, 68, 68'))) {
+            targetCell.style.border = '3px solid #dc2626';
+        } else {
+            targetCell.style.border = '2px solid #e2e8f0';
+        }
+        
+        targetCell.style.boxShadow = originalBoxShadow || 'none';
+        targetCell.style.zIndex = originalZIndex || '1';
+        targetCell.style.transform = originalTransform || 'scale(1)';
+        
+        // إعادة الـ headers
+        if (rowHeader) {
+            rowHeader.style.removeProperty('background');
+            rowHeader.style.removeProperty('border');
+            rowHeader.style.removeProperty('box-shadow');
+            rowHeader.style.removeProperty('transition');
+            
+            rowHeader.style.background = originalRowHeaderBg || '#667eea';
+            rowHeader.style.border = originalRowHeaderBorder || '1px solid #5568d3';
+        }
+        
+        if (columnHeader) {
+            columnHeader.style.removeProperty('background');
+            columnHeader.style.removeProperty('border');
+            columnHeader.style.removeProperty('box-shadow');
+            columnHeader.style.removeProperty('transition');
+            
+            columnHeader.style.background = originalColHeaderBg || '#667eea';
+            columnHeader.style.border = originalColHeaderBorder || '1px solid #5568d3';
+        }
+        
+        console.log('Removed highlight effect');
+    }, 3000);
+    
+    // التمرير للموقع
+    setTimeout(() => {
+        targetCell.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    }, 100);
 }
 
 // معالج المسح
@@ -680,24 +901,7 @@ function hideError() {
     errorMessage.textContent = '';
 }
 
-function showWarning(duplicates) {
-    if (duplicates && duplicates.length > 0) {
-        errorMessage.innerHTML = `
-            <strong>⚠️ أرقام مكررة:</strong><br>
-            ${duplicates.map(num => `<code>${num}</code>`).join(', ')}<br>
-            <small>تم تجاهلها - سيظهر كل منتج مرة واحدة</small>
-        `;
-        errorMessage.className = 'alert alert-warning';
-        errorMessage.style.display = 'block';
-        
-        // إخفاء التحذير بعد 5 ثوان
-        setTimeout(() => {
-            if (errorMessage.className.includes('alert-warning')) {
-                hideError();
-            }
-        }, 5000);
-    }
-}
+ 
 
 // Export to PDF - New improved version with page splitting
 async function exportToPDF() {
@@ -1182,3 +1386,215 @@ function showProductDetails(product, row, col) {
     // إضافة Modal إلى الصفحة
     document.body.appendChild(modal);
 }
+
+// ==================== دوال الحفظ التلقائي ====================
+
+/**
+ * حفظ البيانات في LocalStorage
+ */
+function autoSaveData() {
+    const productNumbers = productNumbersTextarea.value.trim();
+    const recipientName = recipientNameInput ? recipientNameInput.value.trim() : '';
+    
+    // لا تحفظ إذا كانت البيانات فارغة
+    if (!productNumbers && !recipientName) {
+        return;
+    }
+    
+    try {
+        // حفظ البيانات
+        localStorage.setItem(STORAGE_KEY, productNumbers);
+        localStorage.setItem(STORAGE_RECIPIENT_KEY, recipientName);
+        localStorage.setItem(STORAGE_TIMESTAMP_KEY, new Date().toISOString());
+        
+        // إظهار رسالة الحفظ
+        showSaveStatus();
+        
+        // تحديث زر الاستعادة
+        updateRestoreButton();
+        
+        console.log('✅ تم الحفظ التلقائي');
+    } catch (error) {
+        console.error('خطأ في الحفظ:', error);
+    }
+}
+
+/**
+ * استعادة البيانات من LocalStorage
+ */
+function restoreData() {
+    try {
+        const savedProducts = localStorage.getItem(STORAGE_KEY);
+        const savedRecipient = localStorage.getItem(STORAGE_RECIPIENT_KEY);
+        
+        if (savedProducts || savedRecipient) {
+            // تأكيد الاستعادة إذا كان هناك بيانات حالية
+            const currentProducts = productNumbersTextarea.value.trim();
+            const currentRecipient = recipientNameInput ? recipientNameInput.value.trim() : '';
+            
+            if (currentProducts || currentRecipient) {
+                const confirmed = confirm('هل تريد استبدال البيانات الحالية بالبيانات المحفوظة؟');
+                if (!confirmed) {
+                    return;
+                }
+            }
+            
+            // استعادة البيانات
+            if (savedProducts) {
+                productNumbersTextarea.value = savedProducts;
+                productNumbersTextarea.dispatchEvent(new Event('input'));
+                productNumbersTextarea.focus();
+            }
+            if (savedRecipient && recipientNameInput) {
+                recipientNameInput.value = savedRecipient;
+                recipientNameInput.dispatchEvent(new Event('input'));
+            }
+            
+            // إظهار رسالة نجاح
+            showNotification('✅ تم استعادة البيانات بنجاح', 'success');
+            
+            console.log('✅ تم استعادة البيانات');
+        } else {
+            showNotification('⚠️ لا توجد بيانات محفوظة', 'warning');
+        }
+    } catch (error) {
+        console.error('خطأ في الاستعادة:', error);
+        showNotification('❌ حدث خطأ أثناء استعادة البيانات', 'error');
+    }
+}
+
+/**
+ * فحص وجود بيانات محفوظة عند تحميل الصفحة
+ */
+function checkForSavedData() {
+    try {
+        const savedProducts = localStorage.getItem(STORAGE_KEY);
+        const savedTimestamp = localStorage.getItem(STORAGE_TIMESTAMP_KEY);
+        
+        if (savedProducts && savedTimestamp) {
+            // إظهار زر الاستعادة
+            updateRestoreButton();
+            
+            // إظهار معلومات آخر حفظ
+            updateLastSavedInfo(savedTimestamp);
+            
+            console.log('📋 توجد بيانات محفوظة');
+        }
+    } catch (error) {
+        console.error('خطأ في فحص البيانات:', error);
+    }
+}
+
+/**
+ * تحديث زر الاستعادة
+ */
+function updateRestoreButton() {
+    const savedProducts = localStorage.getItem(STORAGE_KEY);
+    
+    if (savedProducts && restoreBtn) {
+        restoreBtn.style.display = 'flex';
+    }
+}
+
+/**
+ * تحديث معلومات آخر حفظ
+ */
+function updateLastSavedInfo(timestamp) {
+    if (!lastSavedInfo || !lastSavedTime) return;
+    
+    try {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffMinutes = Math.floor((now - date) / 60000);
+        
+        let timeText = '';
+        if (diffMinutes < 1) {
+            timeText = 'الآن';
+        } else if (diffMinutes < 60) {
+            timeText = `منذ ${diffMinutes} دقيقة`;
+        } else if (diffMinutes < 1440) {
+            const hours = Math.floor(diffMinutes / 60);
+            timeText = `منذ ${hours} ساعة`;
+        } else {
+            timeText = date.toLocaleDateString('ar-EG', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        lastSavedTime.textContent = timeText;
+        lastSavedInfo.style.display = 'block';
+    } catch (error) {
+        console.error('خطأ في تحديث وقت الحفظ:', error);
+    }
+}
+
+/**
+ * إظهار حالة الحفظ
+ */
+function showSaveStatus() {
+    if (!autoSaveStatus) return;
+    
+    autoSaveStatus.style.display = 'inline';
+    
+    // إخفاء بعد 2 ثانية
+    setTimeout(() => {
+        autoSaveStatus.style.display = 'none';
+    }, 2000);
+    
+    // تحديث معلومات آخر حفظ
+    updateLastSavedInfo(new Date().toISOString());
+}
+
+/**
+ * إظهار إشعار
+ */
+function showNotification(message, type = 'info') {
+    // إنشاء عنصر الإشعار
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#f59e0b'};
+        color: white;
+        padding: 15px 25px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 10000;
+        font-weight: 600;
+        animation: slideIn 0.3s ease;
+    `;
+    notification.textContent = message;
+    
+    // إضافة الأنيميشن
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(notification);
+    
+    // إزالة بعد 3 ثواني
+    setTimeout(() => {
+        notification.style.animation = 'slideIn 0.3s ease reverse';
+        setTimeout(() => {
+            notification.remove();
+            style.remove();
+        }, 300);
+    }, 3000);
+}
+

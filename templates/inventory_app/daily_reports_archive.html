@@ -120,12 +120,24 @@
                         <div class="stat-label">📤 كميات مسحوبة</div>
                     </div>
                     <div class="stat-item">
+                        <div class="stat-value">{{ report.quantities_added }}</div>
+                        <div class="stat-label">🟢 إضافة كميات</div>
+                    </div>
+                    <div class="stat-item">
                         <div class="stat-value">{{ report.locations_assigned }}</div>
                         <div class="stat-label">📍 مواقع مخصصة</div>
                     </div>
                     <div class="stat-item">
+                        <div class="stat-value">{{ report.locations_removed }}</div>
+                        <div class="stat-label">📍✕ إلغاء ربط مواقع</div>
+                    </div>
+                    <div class="stat-item">
                         <div class="stat-value">{{ report.total_added }}</div>
                         <div class="stat-label">📊 إجمالي مضافة</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ report.total_removed }}</div>
+                        <div class="stat-label">📉 إجمالي مسحوبة</div>
                     </div>
                 </div>
                 

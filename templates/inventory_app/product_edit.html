@@ -24,7 +24,7 @@
         {% endif %}
 
         <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: var(--shadow-lg);">
-            <form method="POST">
+            <form method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
                 
                 <div class="form-group">
@@ -54,6 +54,28 @@
                 <div class="form-group">
                     <label for="quantity">الكمية</label>
                     <input type="number" id="quantity" name="quantity" value="{{ product.quantity }}" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="image">صورة المنتج</label>
+                    <input type="file" id="image" name="image" accept="image/*">
+                    <small>اختر صورة جديدة من جهازك (JPG, PNG, GIF) - اختياري</small>
+                    
+                    {% if product.image %}
+                        <div style="margin-top: 15px; padding: 15px; background: #f8fafc; border-radius: 8px;">
+                            <p style="margin-bottom: 10px; color: #64748b; font-weight: 600;">الصورة الحالية:</p>
+                            <img src="{{ product.image.url }}" alt="{{ product.name }}" 
+                                 style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid #e2e8f0;">
+                            <div style="margin-top: 10px;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="delete_image" value="1">
+                                    <span style="color: #ef4444; font-size: 0.9rem;">🗑️ حذف الصورة الحالية</span>
+                                </label>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    <div id="image-preview" style="margin-top: 10px;"></div>
                 </div>
 
                 <div class="header-actions" style="margin-top: 30px;">
@@ -164,17 +186,7 @@
                 </a>
             </div>
             
-            <div class="sidebar-section">
-                <div class="sidebar-title">التقارير</div>
-                <a href="/daily-reports/" class="sidebar-link">
-                    <span class="icon">📊</span>
-                    <span class="text">التقارير اليومية</span>
-                </a>
-                <a href="/daily-reports-archive/" class="sidebar-link">
-                    <span class="icon">📚</span>
-                    <span class="text">سجل التقارير</span>
-                </a>
-            </div>
+            
             
             <div class="sidebar-section">
                 <div class="sidebar-title">الصيانة</div>
@@ -255,6 +267,33 @@
     <script src="{% static 'js/auto_refresh.js' %}"></script>
     <script src="{% static 'js/quick_search.js' %}"></script>
     <script src="{% static 'js/notifications.js' %}"></script>
+    
+    <script>
+        // معاينة الصورة الجديدة قبل الرفع
+        document.getElementById('image').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const preview = document.getElementById('image-preview');
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.innerHTML = `
+                        <div style="margin-top: 10px; padding: 15px; background: #ecfdf5; border-radius: 8px; border: 2px solid #10b981;">
+                            <p style="margin-bottom: 10px; color: #065f46; font-weight: 600;">✅ الصورة الجديدة (معاينة):</p>
+                            <img src="${e.target.result}" alt="معاينة" 
+                                 style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid #10b981;">
+                            <p style="margin-top: 10px; color: #064e3b; font-size: 0.9rem;">
+                                📁 ${file.name} (${(file.size / 1024).toFixed(2)} KB)
+                            </p>
+                        </div>
+                    `;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                preview.innerHTML = '';
+            }
+        });
+    </script>
 </body>
 </html>
 

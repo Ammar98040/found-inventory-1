@@ -1,0 +1,175 @@
+<!-- Sidebar -->
+<button id="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+
+<div id="sidebar-overlay"></div>
+
+<div id="main-sidebar">
+    <div class="sidebar-header">
+        <h2>🧭 القوائم</h2>
+        <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+    </div>
+    
+    <!-- حقل البحث -->
+    <div class="sidebar-search">
+        <input type="text" id="sidebar-search-input" placeholder="🔍 ابحث في القوائم..." autocomplete="off">
+        <div id="sidebar-search-results"></div>
+    </div>
+    
+    <div class="sidebar-content" id="sidebar-main-content">
+        <div class="sidebar-section">
+            <div class="sidebar-title">الرئيسية</div>
+            <a href="/" class="sidebar-link">
+                <span class="icon">🔍</span>
+                <span class="text">البحث عن المنتجات</span>
+            </a>
+            <a href="/dashboard/" class="sidebar-link">
+                <span class="icon">📊</span>
+                <span class="text">لوحة التحكم</span>
+            </a>
+        </div>
+        
+        <div class="sidebar-section">
+            <div class="sidebar-title">إدارة المنتجات</div>
+            <a href="/products/" class="sidebar-link">
+                <span class="icon">📦</span>
+                <span class="text">قائمة المنتجات</span>
+            </a>
+            <a href="/products/add/" class="sidebar-link">
+                <span class="icon">➕</span>
+                <span class="text">إضافة منتج جديد</span>
+            </a>
+            <a href="/containers/" class="sidebar-link">
+                <span class="icon">📦</span>
+                <span class="text">إدارة الحاويات</span>
+            </a>
+        </div>
+        
+        <div class="sidebar-section">
+            <div class="sidebar-title">المستودع</div>
+            <a href="/manage/" class="sidebar-link">
+                <span class="icon">⚙️</span>
+                <span class="text">إدارة المستودع</span>
+            </a>
+            <a href="/locations/" class="sidebar-link">
+                <span class="icon">📍</span>
+                <span class="text">الأماكن</span>
+            </a>
+        </div>
+        
+        <div class="sidebar-section">
+            <div class="sidebar-title">الطلبات والمرتجعات</div>
+            <a href="/orders/" class="sidebar-link">
+                <span class="icon">📋</span>
+                <span class="text">الطلبات المسحوبة</span>
+            </a>
+            <a href="/returns/" class="sidebar-link">
+                <span class="icon">↩️</span>
+                <span class="text">المرتجعات</span>
+            </a>
+        </div>
+        
+        <div class="sidebar-section">
+            <div class="sidebar-title">السجلات</div>
+            <a href="/audit-logs/" class="sidebar-link">
+                <span class="icon">📋</span>
+                <span class="text">سجلات العمليات</span>
+            </a>
+        </div>
+        
+        
+        
+        <div class="sidebar-section">
+            <div class="sidebar-title">الصيانة</div>
+            <a href="/backup-restore/" class="sidebar-link">
+                <span class="icon">💾</span>
+                <span class="text">النسخ الاحتياطي</span>
+            </a>
+            <a href="/data-deletion/" class="sidebar-link">
+                <span class="icon">🗑️</span>
+                <span class="text">حذف البيانات</span>
+            </a>
+        </div>
+        
+        {% if user.is_authenticated %}
+        <div class="sidebar-section">
+            <div class="sidebar-title">الحساب</div>
+            <a href="/profile/" class="sidebar-link">
+                <span class="icon">👤</span>
+                <span class="text">الملف الشخصي</span>
+            </a>
+            {% if user.userprofile.user_type == 'admin' %}
+            <a href="/admin-dashboard/" class="sidebar-link">
+                <span class="icon">⚙️</span>
+                <span class="text">لوحة الإدارة</span>
+            </a>
+            {% endif %}
+            <a href="/logout/" class="sidebar-link">
+                <span class="icon">🚪</span>
+                <span class="text">تسجيل الخروج</span>
+            </a>
+        </div>
+        {% endif %}
+        
+        <div class="sidebar-section">
+            <div class="sidebar-title">الإحصائيات الحية</div>
+            <div class="stats-container">
+                <!-- المنتجات -->
+                <div class="stat-category">
+                    <div class="stat-category-title">📦 المنتجات</div>
+                    <div class="stat-item">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stats-products">-</div>
+                            <div class="stat-label">إجمالي</div>
+                        </div>
+                    </div>
+                    <div class="stat-item mini">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stats-products-with-locations">-</div>
+                            <div class="stat-label">لها موقع</div>
+                        </div>
+                    </div>
+                    <div class="stat-item mini">
+                        <div class="stat-icon">❌</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stats-products-without-locations">-</div>
+                            <div class="stat-label">بدون موقع</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- الأماكن -->
+                <div class="stat-category">
+                    <div class="stat-category-title">📍 الأماكن</div>
+                    <div class="stat-item">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stats-capacity">-</div>
+                            <div class="stat-label">السعة الإجمالية</div>
+                        </div>
+                    </div>
+                    <div class="stat-item mini">
+                        <div class="stat-icon">🟢</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stats-occupied">-</div>
+                            <div class="stat-label">مشغولة</div>
+                        </div>
+                    </div>
+                    <div class="stat-item mini">
+                        <div class="stat-icon">⚪</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stats-empty">-</div>
+                            <div class="stat-label">فارغة</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.75rem; color: #94a3b8; text-align: center;">
+                    🟢 Live Mode - تحديث كل 15 ثانية
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

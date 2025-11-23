@@ -34,10 +34,17 @@ urlpatterns = [
     path('products/<int:product_id>/assign/', views.assign_location_to_product, name='assign_location'),
     path('products/<int:product_id>/move/', views.move_product_with_shift, name='move_product_with_shift'),
     path('api/delete-products-bulk/', views.delete_products_bulk, name='delete_products_bulk'),
+    path('api/products/<int:product_id>/update-dozens-per-carton/', views.update_dozens_per_carton, name='update_dozens_per_carton'),
     
     # تصدير البيانات
     path('export/products/excel/', views.export_products_excel, name='export_products_excel'),
     path('export/products/pdf/', views.export_products_pdf, name='export_products_pdf'),
+    
+    # استيراد المنتجات من Excel
+    path('products/import-excel/', views.import_products_excel, name='import_products_excel'),
+    path('api/upload-excel/', views.upload_excel_file, name='upload_excel_file'),
+    path('api/preview-excel/', views.preview_excel_data, name='preview_excel_data'),
+    path('api/process-excel/', views.process_excel_data, name='process_excel_data'),
     
     # إدارة المستودعات
     path('warehouses/', views.warehouses_list, name='warehouses_list'),
@@ -50,16 +57,15 @@ urlpatterns = [
     # سجلات العمليات
     path('audit-logs/', views.audit_logs, name='audit_logs'),
     
-    # التقارير اليومية
-    path('daily-reports/', views.daily_reports, name='daily_reports'),
-    path('api/save-daily-report/', views.save_daily_report, name='save_daily_report'),
-    path('daily-reports-archive/', views.daily_reports_archive, name='daily_reports_archive'),
-    path('daily-report/<int:report_id>/', views.daily_report_detail, name='daily_report_detail'),
+    # التقارير اليومية (محذوفة)
     
     # النسخ الاحتياطي والاستعادة
     path('backup-restore/', views.backup_restore_page, name='backup_restore'),
     path('api/export-backup/', views.export_backup, name='export_backup'),
     path('api/import-backup/', views.import_backup, name='import_backup'),
+    path('data-quality/', views.data_quality_report, name='data_quality'),
+    path('inventory-insights/', views.inventory_insights, name='inventory_insights'),
+    path('api/low-stock/', views.low_stock_products_api, name='low_stock_products_api'),
     
     # حذف البيانات
     path('data-deletion/', views.data_deletion_page, name='data_deletion'),
@@ -90,5 +96,11 @@ urlpatterns = [
     path('staff/<int:user_id>/edit/', views.edit_staff, name='edit_staff'),
     path('api/toggle-staff-active/<int:user_id>/', views.toggle_staff_active, name='toggle_staff_active'),
     path('api/delete-staff/<int:user_id>/', views.delete_staff, name='delete_staff'),
-]
+    
+    # إدارة الحاويات
+    path('containers/', views.container_list, name='container_list'),
+    path('api/container/add/', views.container_add, name='container_add'),
+    path('api/container/<int:container_id>/delete/', views.container_delete, name='container_delete'),
+    path('api/assign-products-to-container/', views.assign_products_to_container, name='assign_products_to_container'),
 
+]

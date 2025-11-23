@@ -2,7 +2,7 @@ import json
 import os
 from django.core.management.base import BaseCommand
 from django.core import serializers
-from inventory_app.models import Product, Location, Warehouse, AuditLog, DailyReportArchive
+from inventory_app.models import Product, Location, Warehouse, AuditLog
 from datetime import datetime
 
 
@@ -42,7 +42,6 @@ class Command(BaseCommand):
                 'locations': json.loads(serializers.serialize('json', Location.objects.all())),
                 'products': json.loads(serializers.serialize('json', Product.objects.all())),
                 'audit_logs': json.loads(serializers.serialize('json', AuditLog.objects.all())),
-                'daily_reports': json.loads(serializers.serialize('json', DailyReportArchive.objects.all())),
             }
             
             # كتابة الملف
@@ -60,7 +59,6 @@ class Command(BaseCommand):
                 'locations': Location.objects.count(),
                 'products': Product.objects.count(),
                 'audit_logs': AuditLog.objects.count(),
-                'daily_reports': DailyReportArchive.objects.count(),
             }
             
             self.stdout.write(self.style.SUCCESS('✓ تم التصدير بنجاح!'))

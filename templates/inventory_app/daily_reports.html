@@ -163,9 +163,19 @@
                 <div class="stat-label">سحب كميات</div>
             </div>
             <div class="stat-card">
+                <div class="stat-icon">🟢</div>
+                <div class="stat-value">{{ quantities_added }}</div>
+                <div class="stat-label">إضافة كميات</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-icon">📍</div>
                 <div class="stat-value">{{ locations_assigned }}</div>
                 <div class="stat-label">ربط مواقع</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📍✕</div>
+                <div class="stat-value">{{ locations_removed }}</div>
+                <div class="stat-label">إلغاء ربط مواقع</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">📊</div>
@@ -223,9 +233,15 @@
                             {% elif log.action == 'quantity_taken' %}
                                 <span class="log-icon">📤</span>
                                 <span class="badge badge-danger">سحب</span>
+                            {% elif log.action == 'quantity_added' %}
+                                <span class="log-icon">🟢</span>
+                                <span class="badge badge-success">إضافة كمية</span>
                             {% elif log.action == 'location_assigned' %}
                                 <span class="log-icon">📍</span>
                                 <span class="badge badge-info">ربط موقع</span>
+                            {% elif log.action == 'location_removed' %}
+                                <span class="log-icon">📍✕</span>
+                                <span class="badge badge-danger">إلغاء ربط</span>
                             {% else %}
                                 <span class="log-icon">⚙️</span>
                                 <span class="badge">{{ log.action }}</span>

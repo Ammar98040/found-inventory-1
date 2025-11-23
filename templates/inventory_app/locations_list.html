@@ -25,6 +25,7 @@
     <div class="container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
             <h1>📍 الأماكن</h1>
+            
         </div>
 
         <div class="warehouse-info-header">
@@ -39,35 +40,43 @@
             <h3 style="margin-bottom: 20px; text-align: center;">📍 شبكة الأماكن في المستودع</h3>
             
             <div class="warehouse-grid-wrapper" style="width: 100%; overflow: auto; max-height: 70vh; border: 2px solid #e2e8f0; border-radius: 8px; padding: 10px;">
-                <div id="warehouse-grid" style="display: flex; flex-direction: column; gap: 0;">
+                <div id="warehouse-grid" data-rows="{{ warehouse.rows_count }}" data-columns="{{ warehouse.columns_count }}" style="display: flex; flex-direction: column; gap: 0;">
                     <!-- سيتم إنشاء الشبكة عبر JavaScript -->
                 </div>
             </div>
         </div>
         
+        <div id="locations-data" style="display:none;">
+            {% for location in locations %}
+                <div class="location-item"
+                     data-id="{{ location.id }}"
+                     data-row="{{ location.row }}"
+                     data-column="{{ location.column }}"
+                     data-full="{{ location.full_location }}"
+                     data-has-products="{% if location.products.exists %}true{% else %}false{% endif %}"
+                     data-products-count="{{ location.products.count }}"
+                     data-notes="{{ location.notes|default:"" }}"
+                     data-products="{% for product in location.products.all %}{{ product.product_number }}{% if not forloop.last %},{% endif %}{% endfor %}"></div>
+            {% endfor %}
+        </div>
+        
         <script>
             // إنشاء الشبكة ديناميكياً
             const warehouseGrid = document.getElementById('warehouse-grid');
-            const rows = {{ warehouse.rows_count }};
-            const columns = {{ warehouse.columns_count }};
-            const locations = [
-                {% for location in locations %}
-                    {
-                        id: {{ location.id }},
-                        row: {{ location.row }},
-                        column: {{ location.column }},
-                        full_location: '{{ location.full_location }}',
-                        has_products: {% if location.products.exists %}true{% else %}false{% endif %},
-                        products_count: {{ location.products.count }},
-                        notes: '{{ location.notes|default:"" }}',
-                        products: [
-                            {% for product in location.products.all %}
-                                '{{ product.product_number }}',
-                            {% endfor %}
-                        ]
-                    },
-                {% endfor %}
-            ];
+            const rows = parseInt(warehouseGrid.dataset.rows);
+            const columns = parseInt(warehouseGrid.dataset.columns);
+            const locations = Array.from(document.querySelectorAll('#locations-data .location-item')).map(function(el){
+                return {
+                    id: parseInt(el.dataset.id),
+                    row: parseInt(el.dataset.row),
+                    column: parseInt(el.dataset.column),
+                    full_location: el.dataset.full,
+                    has_products: el.dataset.hasProducts === 'true',
+                    products_count: parseInt(el.dataset.productsCount || '0'),
+                    notes: el.dataset.notes || '',
+                    products: (el.dataset.products || '').split(',').filter(Boolean)
+                };
+            });
             
             // إنشاء رأس الأعمدة
             const headerRow = document.createElement('div');
@@ -301,17 +310,7 @@
                 </a>
             </div>
             
-            <div class="sidebar-section">
-                <div class="sidebar-title">التقارير</div>
-                <a href="/daily-reports/" class="sidebar-link">
-                    <span class="icon">📊</span>
-                    <span class="text">التقارير اليومية</span>
-                </a>
-                <a href="/daily-reports-archive/" class="sidebar-link">
-                    <span class="icon">📚</span>
-                    <span class="text">سجل التقارير</span>
-                </a>
-            </div>
+            
             
             <div class="sidebar-section">
                 <div class="sidebar-title">الصيانة</div>

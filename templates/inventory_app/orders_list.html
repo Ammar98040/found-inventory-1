@@ -162,7 +162,7 @@
                                     <span class="btn-icon">👁️</span>
                                     التفاصيل
                                 </a>
-                                <button onclick="deleteOrder({{ order.id }}, '{{ order.order_number }}')" class="btn btn-sm" style="background: #ef4444; color: white; flex: 1;">
+                                <button class="btn btn-sm delete-order-btn" data-id="{{ order.id }}" data-number="{{ order.order_number }}" style="background: #ef4444; color: white; flex: 1;">
                                     <span class="btn-icon">🗑️</span>
                                     حذف
                                 </button>
@@ -209,6 +209,15 @@
                 alert('✗ خطأ: ' + error.message);
             }
         }
+        document.addEventListener('DOMContentLoaded', function(){
+            document.querySelectorAll('.delete-order-btn').forEach(function(btn){
+                btn.addEventListener('click', function(){
+                    var id = this.getAttribute('data-id');
+                    var num = this.getAttribute('data-number');
+                    deleteOrder(id, num);
+                });
+            });
+        });
     </script>
 </body>
 </html>

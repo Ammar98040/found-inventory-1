@@ -19,7 +19,8 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+# ALLOWED_HOSTS - يتم تحميلها من ملف .env
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost').split(',')
 
 # إعدادات CSRF للمحلي فقط
 CSRF_TRUSTED_ORIGINS = [
@@ -33,6 +34,7 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
 
 
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -42,7 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'inventory_app',
+    'inventory_app.apps.InventoryAppConfig',
 ]
 
 MIDDLEWARE = [
@@ -81,7 +83,7 @@ WSGI_APPLICATION = 'inventory_project.wsgi.application'
 
 # قاعدة بيانات PostgreSQL
 # جميع معلومات الاتصال محمية في ملف .env (غير موجود في Git)
-# يجب إنشاء ملف .env في المجلد الرئيسي مع إعدادات قاعدة البيانات
+# يجب تحديث ملف .env بمعلومات قاعدة البيانات الصحيحة
 
 DATABASES = {
     'default': {
@@ -98,6 +100,16 @@ DATABASES = {
         },
     }
 }
+
+# قاعدة بيانات SQLite للتطوير (معطلة - يتم استخدام PostgreSQL)
+# لاستخدام SQLite للتطوير المحلي، قم بتعليق كود PostgreSQL أعلاه وإلغاء تعليق الكود التالي:
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 
 
 # Password validation

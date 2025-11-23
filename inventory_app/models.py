@@ -2,6 +2,7 @@ from django.db import models
 from django.core.validators import MinValueValidator
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.core.validators import RegexValidator
 
 
 class Warehouse(models.Model):
@@ -71,6 +72,26 @@ class Location(models.Model):
         }
 
 
+class Container(models.Model):
+    """نموذج الحاوية - لتصنيف المنتجات في مجموعات"""
+    name = models.CharField(max_length=100, unique=True, verbose_name='اسم الحاوية')
+    description = models.TextField(blank=True, null=True, verbose_name='الوصف')
+    color = models.CharField(max_length=7, default='#667eea', verbose_name='اللون')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاريخ الإنشاء')
+    
+    class Meta:
+        verbose_name = 'حاوية'
+        verbose_name_plural = 'الحاويات'
+        ordering = ['name']
+    
+    def __str__(self):
+        return self.name
+    
+    def get_products_count(self):
+        """عدد المنتجات في الحاوية"""
+        return self.products.count()
+
+
 class Product(models.Model):
     """نموذج المنتج - يمثل منتجاً في المستودع"""
     product_number = models.CharField(max_length=100, unique=True, verbose_name='رقم المنتج', db_index=True)
@@ -78,11 +99,30 @@ class Product(models.Model):
     category = models.CharField(max_length=100, blank=True, null=True, verbose_name='الفئة')
     description = models.TextField(blank=True, null=True, verbose_name='الوصف')
     
+    # ربط المنتج بحاوية
+    container = models.ForeignKey('Container', on_delete=models.SET_NULL, related_name='products', blank=True, null=True, verbose_name='الحاوية')
+    
     # ربط المنتج بموقع واحد فقط
     location = models.ForeignKey(Location, on_delete=models.SET_NULL, related_name='products', blank=True, null=True, verbose_name='الموقع')
     
     # معلومات الإضافة
     quantity = models.IntegerField(default=1, validators=[MinValueValidator(0)], verbose_name='الكمية')
+    
+    # معلومات الكراتين (للاستيراد من Excel)
+    qty_per_carton = models.IntegerField(blank=True, null=True, validators=[MinValueValidator(1)], verbose_name='عدد الحبات في الكرتون')
+    carton_count = models.IntegerField(blank=True, null=True, validators=[MinValueValidator(0)], verbose_name='عدد الكراتين')
+    
+    # حقول إضافية (موجودة في قاعدة البيانات)
+    dozens_per_carton = models.IntegerField(default=1, validators=[MinValueValidator(1)], verbose_name='عدد الدرزنات في الكرتون')
+    pcs_per_dozen = models.IntegerField(default=12, validators=[MinValueValidator(1)], verbose_name='عدد الحبات في الدرزن')
+    min_stock_threshold = models.IntegerField(default=0, validators=[MinValueValidator(0)], verbose_name='الحد الأدنى للمخزون')
+    store_quantity = models.IntegerField(default=0, validators=[MinValueValidator(0)], verbose_name='كمية المحل')
+    warehouse_quantity = models.IntegerField(default=0, validators=[MinValueValidator(0)], verbose_name='كمية المستودع')
+    barcode = models.CharField(max_length=100, blank=True, null=True, verbose_name='الباركود')
+    image_url = models.CharField(max_length=500, blank=True, null=True, verbose_name='رابط الصورة')
+    image = models.ImageField(upload_to='products/', blank=True, null=True, verbose_name='صورة المنتج')
+    price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name='السعر')
+    
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاريخ الإضافة')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='آخر تحديث')
     
@@ -103,6 +143,71 @@ class Product(models.Model):
     def get_primary_location(self):
         """إرجاع الموقع الأساسي للمنتج"""
         return self.location
+    
+    def get_total_dozens(self):
+        """حساب إجمالي عدد الدرازن من الكمية الإجمالية"""
+        if self.pcs_per_dozen and self.pcs_per_dozen > 0:
+            return self.quantity / self.pcs_per_dozen
+        return 0
+    
+    def get_total_cartons(self):
+        """حساب إجمالي عدد الكراتين من الكمية الإجمالية"""
+        if self.dozens_per_carton and self.dozens_per_carton > 0 and self.pcs_per_dozen and self.pcs_per_dozen > 0:
+            total_dozens = self.get_total_dozens()
+            return total_dozens / self.dozens_per_carton
+        return 0
+    
+    def get_quantity_breakdown(self):
+        """
+        حساب تفصيلي للكمية: كراتين + درازن + حبات
+        مثال: 3 كرتون + 1 درزن + 8 حبات
+        """
+        if not self.pcs_per_dozen or self.pcs_per_dozen <= 0:
+            return {
+                'cartons': 0,
+                'dozens': 0,
+                'pieces': self.quantity,
+                'formatted': f'{self.quantity} حبة'
+            }
+        
+        remaining_quantity = self.quantity
+        
+        # حساب عدد الكراتين (عدد صحيح فقط)
+        cartons = 0
+        if self.dozens_per_carton and self.dozens_per_carton > 0:
+            pieces_per_carton = self.dozens_per_carton * self.pcs_per_dozen
+            cartons = remaining_quantity // pieces_per_carton
+            remaining_quantity = remaining_quantity % pieces_per_carton
+        
+        # حساب عدد الدرازن (عدد صحيح فقط)
+        dozens = remaining_quantity // self.pcs_per_dozen
+        
+        # الباقي بالحبات
+        pieces = remaining_quantity % self.pcs_per_dozen
+        
+        # تنسيق النص
+        parts = []
+        if cartons > 0:
+            parts.append(f'{cartons} كرتون')
+        if dozens > 0:
+            parts.append(f'{dozens} درزن')
+        if pieces > 0:
+            parts.append(f'{pieces} حبة')
+        
+        formatted = ' + '.join(parts) if parts else '0 حبة'
+        
+        return {
+            'cartons': cartons,
+            'dozens': dozens,
+            'pieces': pieces,
+            'formatted': formatted
+        }
+    
+    def update_quantities_from_cartons(self):
+        """تحديث الكمية الإجمالية بناءً على عدد الكراتين"""
+        if self.dozens_per_carton and self.pcs_per_dozen:
+            total_dozens = self.dozens_per_carton * (self.carton_count or 0)
+            self.quantity = total_dozens * self.pcs_per_dozen
 
 
 class AuditLog(models.Model):
@@ -117,12 +222,13 @@ class AuditLog(models.Model):
     ]
     
     action = models.CharField(max_length=20, choices=ACTION_CHOICES, verbose_name='العملية')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='audit_logs', verbose_name='المنتج')
+    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs', verbose_name='المنتج')
     product_number = models.CharField(max_length=50, verbose_name='رقم المنتج')
     quantity_before = models.IntegerField(null=True, blank=True, verbose_name='الكمية قبل')
     quantity_after = models.IntegerField(null=True, blank=True, verbose_name='الكمية بعد')
     quantity_change = models.IntegerField(default=0, verbose_name='التغيير')
     notes = models.TextField(blank=True, verbose_name='ملاحظات')
+    product_snapshot = models.JSONField(blank=True, null=True, verbose_name='لقطة المنتج عند الإجراء')
     user = models.CharField(max_length=100, blank=True, default='System', verbose_name='المستخدم')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='التاريخ')
     
@@ -141,38 +247,6 @@ class AuditLog(models.Model):
         return f"{self.get_action_display()} - {self.product_number} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
 
-class DailyReportArchive(models.Model):
-    """نموذج لحفظ التقارير اليومية"""
-    report_date = models.DateField(verbose_name='تاريخ التقرير', unique=True)
-    hijri_date = models.CharField(max_length=100, verbose_name='التاريخ الهجري', blank=True)
-    
-    # الإحصائيات
-    products_added = models.IntegerField(default=0, verbose_name='منتجات مضافة')
-    products_updated = models.IntegerField(default=0, verbose_name='منتجات محدثة')
-    products_deleted = models.IntegerField(default=0, verbose_name='منتجات محذوفة')
-    quantities_taken = models.IntegerField(default=0, verbose_name='كميات مسحوبة')
-    locations_assigned = models.IntegerField(default=0, verbose_name='مواقع مخصصة')
-    total_added = models.IntegerField(default=0, verbose_name='إجمالي الكميات المضافة')
-    total_removed = models.IntegerField(default=0, verbose_name='إجمالي الكميات المسحوبة')
-    
-    # بيانات JSON كاملة
-    report_data = models.JSONField(verbose_name='بيانات التقرير', default=dict)
-    
-    # علامة للحفظ التلقائي
-    is_auto_saved = models.BooleanField(default=False, verbose_name='حفظ تلقائي')
-    
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاريخ الإنشاء')
-    
-    class Meta:
-        verbose_name = 'تقرير يومي محفوظ'
-        verbose_name_plural = 'التقارير اليومية المحفوظة'
-        ordering = ['-report_date']
-        indexes = [
-            models.Index(fields=['-report_date']),
-        ]
-    
-    def __str__(self):
-        return f"تقرير {self.report_date}"
 
 
 class Order(models.Model):
@@ -408,4 +482,36 @@ class UserActivityLog(models.Model):
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
+
+
+class Client(models.Model):
+    name = models.CharField(max_length=200)
+    phone = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['name']),
+            models.Index(fields=['phone']),
+        ]
+    
+    def __str__(self):
+        return f"{self.name} ({self.phone})"
+
+
+class ClientImage(models.Model):
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='clients/')
+    caption = models.CharField(max_length=200, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['client']),
+        ]
+    
+    def __str__(self):
+        return f"Image {self.id} for {self.client_id}"
 

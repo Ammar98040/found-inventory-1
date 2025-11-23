@@ -56,7 +56,7 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container" data-product-id="{{ product.id }}">
         <div style="margin-bottom: 30px;">
             <h1>📦 تفاصيل المنتج</h1>
         </div>
@@ -68,6 +68,16 @@
 
         <div class="product-info">
             <h2 style="margin-bottom: 20px;">📋 المعلومات</h2>
+            
+            {% if product.image %}
+            <div class="info-row" style="margin-bottom: 20px;">
+                <div style="text-align: center; padding: 20px; background: #f8fafc; border-radius: 8px;">
+                    <img src="{{ product.image.url }}" alt="{{ product.name }}" 
+                         style="max-width: 300px; max-height: 300px; border-radius: 8px; border: 2px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                </div>
+            </div>
+            {% endif %}
+            
             <div class="info-row">
                 <div class="info-label">رقم المنتج:</div>
                 <div class="info-value"><strong>{{ product.product_number }}</strong></div>
@@ -83,6 +93,10 @@
             <div class="info-row">
                 <div class="info-label">الكمية:</div>
                 <div class="info-value">{{ product.quantity }}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">الأصلية (مرجع):</div>
+                <div class="info-value">{{ original_quantity_ref }}</div>
             </div>
             <div class="info-row">
                 <div class="info-label">الوصف:</div>
@@ -218,17 +232,7 @@
                 </a>
             </div>
             
-            <div class="sidebar-section">
-                <div class="sidebar-title">التقارير</div>
-                <a href="/daily-reports/" class="sidebar-link">
-                    <span class="icon">📊</span>
-                    <span class="text">التقارير اليومية</span>
-                </a>
-                <a href="/daily-reports-archive/" class="sidebar-link">
-                    <span class="icon">📚</span>
-                    <span class="text">سجل التقارير</span>
-                </a>
-            </div>
+            
             
             <div class="sidebar-section">
                 <div class="sidebar-title">الصيانة</div>
@@ -311,7 +315,7 @@
     <script>
         function moveProductWithShift() {
             const newLocation = document.getElementById('new-location-input').value.trim();
-            const productId = {{ product.id }};
+            const productId = document.querySelector('.container').dataset.productId;
             
             if (!newLocation) {
                 alert('يرجى إدخال الموقع الجديد');
