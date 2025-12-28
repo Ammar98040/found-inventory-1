@@ -21,6 +21,9 @@ urlpatterns = [
     path('api/add-column/', views.add_column, name='add_column'),
     path('api/delete-row/', views.delete_row, name='delete_row'),
     path('api/delete-column/', views.delete_column, name='delete_column'),
+    path('api/compact-row/', views.compact_row, name='compact_row'),
+    path('api/compact-column/', views.compact_column, name='compact_column'),
+    path('api/revert-compaction/', views.revert_compaction, name='revert_compaction'),
     
     # لوحة التحكم
     path('dashboard/', views.warehouse_dashboard, name='dashboard'),
@@ -34,11 +37,12 @@ urlpatterns = [
     path('products/<int:product_id>/assign/', views.assign_location_to_product, name='assign_location'),
     path('products/<int:product_id>/move/', views.move_product_with_shift, name='move_product_with_shift'),
     path('api/delete-products-bulk/', views.delete_products_bulk, name='delete_products_bulk'),
-    path('api/products/<int:product_id>/update-dozens-per-carton/', views.update_dozens_per_carton, name='update_dozens_per_carton'),
+
     
     # تصدير البيانات
     path('export/products/excel/', views.export_products_excel, name='export_products_excel'),
     path('export/products/pdf/', views.export_products_pdf, name='export_products_pdf'),
+    path('export/order/<int:order_id>/pdf/', views.export_order_pdf, name='export_order_pdf'),
     
     # استيراد المنتجات من Excel
     path('products/import-excel/', views.import_products_excel, name='import_products_excel'),
@@ -56,16 +60,25 @@ urlpatterns = [
     
     # سجلات العمليات
     path('audit-logs/', views.audit_logs, name='audit_logs'),
+    path('audit-logs/restore/<int:log_id>/', views.restore_product, name='restore_product'),
     
     # التقارير اليومية (محذوفة)
     
     # النسخ الاحتياطي والاستعادة
     path('backup-restore/', views.backup_restore_page, name='backup_restore'),
     path('api/export-backup/', views.export_backup, name='export_backup'),
+    path('api/inspect-backup/', views.inspect_backup, name='inspect_backup'),
     path('api/import-backup/', views.import_backup, name='import_backup'),
+    path('api/reset-environment/', views.reset_environment, name='reset_environment'),
     path('data-quality/', views.data_quality_report, name='data_quality'),
     path('inventory-insights/', views.inventory_insights, name='inventory_insights'),
     path('api/low-stock/', views.low_stock_products_api, name='low_stock_products_api'),
+    
+    # دمج ملفات المنتجات (Excel/JSON)
+    path('merge-files/', views.merge_files_page, name='merge_files_page'),
+    path('api/merge-files/upload/', views.merge_files_upload, name='merge_files_upload'),
+    path('api/merge-files/process/', views.merge_files_process, name='merge_files_process'),
+    path('api/merge-files/export/', views.merge_files_export, name='merge_files_export'),
     
     # حذف البيانات
     path('data-deletion/', views.data_deletion_page, name='data_deletion'),
@@ -73,6 +86,10 @@ urlpatterns = [
     
     # إدارة الطلبات المسحوبة
     path('orders/', views.orders_list, name='orders_list'),
+    path('analytics/', views.analytics_dashboard, name='analytics_dashboard'),
+    path('api/analytics-data/', views.get_analytics_data, name='get_analytics_data'),
+    path('api/search-order-history/', views.search_order_history, name='search_order_history'),
+    path('api/recipients-stats/', views.get_all_recipients_stats, name='get_all_recipients_stats'),
     path('orders/<int:order_id>/', views.order_detail, name='order_detail'),
     path('api/delete-order/<int:order_id>/', views.delete_order, name='delete_order'),
     
@@ -104,4 +121,3 @@ urlpatterns = [
     path('api/assign-products-to-container/', views.assign_products_to_container, name='assign_products_to_container'),
 
 ]
-

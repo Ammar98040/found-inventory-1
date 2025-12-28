@@ -9,7 +9,8 @@
     <link rel="stylesheet" href="{% static 'css/search_grid.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
     <link rel="stylesheet" href="{% static 'css/quick_search.css' %}">
-    <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     
     <!-- PDF Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -318,6 +319,54 @@
             transform: translateY(0);
         }
     }
+    .btn-restore {
+        background: #10b981;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-weight: 600;
+    }
+    .input-group label {
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 8px;
+        display: block;
+    }
+    #recipient-name {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 0.95rem;
+        transition: all 0.2s;
+    }
+    #recipient-name:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
+    }
+    .actions-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 8px;
+    }
+    @media (max-width: 768px) {
+        .actions-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .actions-row a.btn {
+            grid-column: 1 / -1;
+            width: 100%;
+        }
+        .btn-restore {
+            width: 100%;
+        }
+    }
 </style>
 
 <body>
@@ -359,8 +408,8 @@
             <!-- قسم الإدخال -->
             <div class="input-section">
                 <div class="input-group">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <label for="product-numbers">أدخل أرقام المنتجات (سطر واحد لكل منتج)</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                        <label for="product-numbers">أدخل أرقام المنتجات (سطر واحد لكل منتج)</label>
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <span id="auto-save-status" style="font-size: 0.85rem; color: #10b981; display: none;">
                                 ✓ تم الحفظ
@@ -372,7 +421,7 @@
                     </div>
                     <textarea 
                         id="product-numbers" 
-                        placeholder="مثال:&#10;123456:10&#10;789012:0&#10;345678&#10;(يسمح فقط: رقم أو رقم:رقم)" 
+                        placeholder="أمثلة:&#10;#200:20&#10;A400:5&#10;980:12&#10;(يدعم أرقام/حروف/رموز مع كمية بعد :)" 
                         rows="10"
                         autofocus
                     ></textarea>
@@ -380,29 +429,31 @@
                         آخر حفظ: <span id="last-saved-time"></span>
                     </div>
                     <small class="hint">
-                        <strong>القاعدة:</strong> رقم أو رقم:رقم (أرقام فقط)<br>
+                        <strong>القاعدة:</strong> أي معرف منتج (أرقام/حروف/رموز) مع إمكانية تحديد الكمية باستخدام <code>:</code><br>
                         <strong>أمثلة:</strong><br>
-                        • <code>123456:10</code><br>
-                        • <code>789012:0</code><br>
-                        • <code>345678</code>
+                        • <code>#200:20</code><br>
+                        • <code>A400:5</code><br>
+                        • <code>980:12</code>
                     </small>
                 </div>
                 <div class="input-group">
                     <label for="recipient-name">اسم المستلم (اختياري)</label>
                     <input id="recipient-name" type="text" placeholder="اكتب اسم المستلم هنا" />
                 </div>
-                <button id="search-btn" class="btn btn-primary">
-                    <span class="btn-icon">🔍</span>
-                    بحث
-                </button>
-                <button id="clear-btn" class="btn btn-secondary">
-                    <span class="btn-icon">🗑️</span>
-                    مسح
-                </button>
-                <a href="/orders/" class="btn btn-primary" style="background: #667eea;">
-                    <span class="btn-icon">📋</span>
-                    سجل الطلبات
-                </a>
+                <div class="actions-row">
+                    <button id="search-btn" class="btn btn-primary">
+                        <span class="btn-icon">🔍</span>
+                        بحث
+                    </button>
+                    <button id="clear-btn" class="btn btn-secondary">
+                        <span class="btn-icon">🗑️</span>
+                        مسح
+                    </button>
+                    <a href="/orders/" class="btn btn-primary" style="background: #667eea; text-decoration: none; text-align: center; display: flex; justify-content: center;">
+                        <span class="btn-icon">📋</span>
+                        سجل الطلبات
+                    </a>
+                </div>
             </div>
 
             <!-- قسم النتائج -->
@@ -449,7 +500,13 @@
     
     <div id="main-sidebar">
         <div class="sidebar-header">
-            <h2>🧭 القوائم</h2>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <img src="{% static 'img/favicon.svg' %}" alt="شعار" style="width: 32px; height: 32px;">
+                <div>
+                    <h2 style="font-size: 1.1rem; margin-bottom: 2px;">قلب العرب</h2>
+                    <div style="font-size: 0.75rem; color: #9ca3af; font-weight: normal;">نظام إدارة المخزون</div>
+                </div>
+            </div>
             <button class="sidebar-close" onclick="toggleSidebar()">×</button>
         </div>
         
@@ -667,7 +724,7 @@
     <script src="{% static 'js/sidebar.js' %}?v=2.3"></script>
     <script src="{% static 'js/auto_refresh.js' %}?v=2.3"></script>
     <script src="{% static 'js/quick_search.js' %}?v=2.3"></script>
-    <script src="{% static 'js/notifications.js' %}?v=2.3"></script>
+    <script src="{% static 'js/offline_sync.js' %}?v=1.0"></script>
     <script src="{% static 'js/main.js' %}?v=2.3"></script>
     
     <script>
@@ -709,4 +766,3 @@
     </script>
 </body>
 </html>
-

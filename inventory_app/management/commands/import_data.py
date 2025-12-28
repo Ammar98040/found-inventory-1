@@ -2,7 +2,7 @@ import json
 from django.core.management.base import BaseCommand
 from django.core import serializers
 from django.db import transaction
-from inventory_app.models import Product, Location, Warehouse, AuditLog
+from inventory_app.models import Product, Location, Warehouse, AuditLog, Order
 from datetime import datetime
 
 
@@ -46,7 +46,7 @@ class Command(BaseCommand):
             
             # عرض الإحصائيات
             self.stdout.write(self.style.WARNING('\n📊 محتوى النسخ الاحتياطي:'))
-            for key in ['warehouses', 'locations', 'products', 'audit_logs']:
+            for key in ['warehouses', 'locations', 'products', 'orders', 'audit_logs']:
                 count = len(data.get(key, []))
                 self.stdout.write(f'  - {key}: {count}')
             
@@ -64,6 +64,7 @@ class Command(BaseCommand):
                 if clear_data:
                     self.stdout.write(self.style.WARNING('جاري حذف البيانات الموجودة...'))
                     AuditLog.objects.all().delete()
+                    Order.objects.all().delete()
                     Product.objects.all().delete()
                     Location.objects.all().delete()
                     Warehouse.objects.all().delete()
@@ -96,6 +97,14 @@ class Command(BaseCommand):
                     for obj in objects:
                         obj.save()
                     self.stdout.write(self.style.SUCCESS(f'    ✓ تم استيراد {len(data["products"])} منتج'))
+                
+                # استيراد الطلبات
+                if 'orders' in data and data['orders']:
+                    self.stdout.write('  - استيراد الطلبات...')
+                    objects = serializers.deserialize('json', json.dumps(data['orders']))
+                    for obj in objects:
+                        obj.save()
+                    self.stdout.write(self.style.SUCCESS(f'    ✓ تم استيراد {len(data["orders"])} طلب'))
                 
                 # استيراد سجلات العمليات
                 if 'audit_logs' in data and data['audit_logs']:

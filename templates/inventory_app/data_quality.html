@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>جودة البيانات</title>
     {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
-    <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+
     <style>
         body{background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%)}
         .dq-header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:18px;border-radius:12px;box-shadow:var(--shadow-lg)}
@@ -25,7 +26,6 @@
         .dq-section.numbers{background:linear-gradient(135deg,#fdf4ff 0%,#fae8ff 100%)}
         .dq-section.missing{background:linear-gradient(135deg,#fff7ed 0%,#fee2e2 100%)}
         .dq-section.inconsistent{background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%)}
-        .dq-section.carton{background:linear-gradient(135deg,#eef2ff 0%,#e0e7ff 100%)}
         .dq-group{border:1px dashed rgba(15,23,42,0.12);border-radius:10px;padding:12px;margin-bottom:10px;background:rgba(255,255,255,0.5)}
         .dq-items{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
         .dq-item{background:#ffffffcc;border-radius:8px;padding:10px}
@@ -44,7 +44,6 @@
             <div class="dq-stat barcodes">تكرار الباركود<br><span style="font-weight:600;opacity:.8">المجموع: {{ counts.barcode }}</span></div>
             <div class="dq-stat numbers">تكرار/تشابه رقم المنتج<br><span style="font-weight:600;opacity:.8">المجموع: {{ counts.number }}</span></div>
             <div class="dq-stat missing">منتجات بدون موقع<br><span style="font-weight:600;opacity:.8">المجموع: {{ counts.missing_location }}</span></div>
-            <div class="dq-stat carton">بيانات الكراتين غير متسقة<br><span style="font-weight:600;opacity:.8">المجموع: {{ counts.invalid_carton }}</span></div>
         </div>
 
         {% if duplicates_by_name %}
@@ -125,21 +124,7 @@
 
         
 
-        {% if counts.invalid_carton %}
-        <div class="dq-section carton">
-            <h2 style="margin-bottom:10px;">بيانات الكراتين غير متسقة</h2>
-            <div class="dq-items" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-                {% for item in invalid_carton_data %}
-                    <div class="dq-item">
-                        <div><strong>رقم:</strong> {{ item.product.product_number }}</div>
-                        <div><strong>اسم:</strong> {{ item.product.name }}</div>
-                        <div><strong>متوقع:</strong> {{ item.expected }}</div>
-                        <div><strong>فعلي:</strong> {{ item.actual }}</div>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
+
     </div>
 
     <button id="sidebar-toggle" onclick="toggleSidebar()">☰</button>
@@ -190,7 +175,7 @@
         </div>
     </div>
 
-    <script src="{% static 'js/notifications.js' %}"></script>
+
     <script src="{% static 'js/sidebar.js' %}"></script>
 </body>
 </html>

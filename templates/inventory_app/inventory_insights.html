@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>توصيات المخزون</title>
     {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
-    <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+
     <style>
         body{background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%)}
         .header{background:linear-gradient(135deg,#22c55e 0%,#16a34a 100%);color:#fff;padding:18px;border-radius:12px;box-shadow:var(--shadow-lg)}
@@ -32,49 +33,12 @@
 <body>
     <div class="container">
         <div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <h1 style="margin:0">📦 توصيات إعادة الطلب وتوازن المخزون</h1>
-            <div class="controls">
-                <label>معامل الفائض:</label>
-                <input id="multiplier-input" type="number" min="1" value="{{ multiplier }}">
-                <a id="apply-multiplier" class="btn secondary" href="?overstock_multiplier={{ multiplier }}">تطبيق</a>
-            </div>
-        </div>
-
-        <div class="section watch" style="margin-top:10px">
-            <div style="font-weight:700; margin-bottom:8px;">📝 ملاحظات القيم</div>
-            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                <span class="badge">منخفض عام ≤ {{ policy.low_stock_limit }}</span>
-                <span class="badge">معامل فائض × {{ policy.overstock_multiplier }}</span>
-                <span class="badge">هامش متابعة ± {{ policy.watchlist_margin_percent }}%</span>
-                <span class="badge">تغيير كبير ≥ {{ policy.large_change_threshold }}</span>
-                <span class="badge">تكرار تغييرات خلال {{ policy.frequent_window_hours }} ساعة ≥ {{ policy.frequent_change_min_count }}</span>
-            </div>
+            <h1 style="margin:0">📦 توصيات المخزون</h1>
         </div>
 
         <div class="stats">
-            <div class="stat reorder">توصيات إعادة الطلب<br><span style="font-weight:600;opacity:.8">{{ counts.reorder }}</span></div>
-            <div class="stat overstock">فائض المخزون<br><span style="font-weight:600;opacity:.8">{{ counts.overstock }}</span></div>
-            <div class="stat watch">قائمة متابعة<br><span style="font-weight:600;opacity:.8">{{ counts.watchlist }}</span></div>
-            <div class="stat watch">منخفض عام (≤ {{ policy.low_stock_limit }})<br><span style="font-weight:600;opacity:.8">{{ counts.low_general }}</span></div>
-            <div class="stat overstock">تنبيهات الشذوذ<br><span style="font-weight:600;opacity:.8">{{ counts.anomaly }}</span></div>
+            <div class="stat watch">منخفض عام (&lt; {{ policy.low_stock_limit }})<br><span style="font-weight:600;opacity:.8">{{ counts.low_general }}</span></div>
         </div>
-
-        {% if reorder_suggestions %}
-        <div class="section reorder">
-            <h2>🔁 إعادة الطلب</h2>
-            <div class="items">
-                {% for s in reorder_suggestions %}
-                    <div class="item">
-                        <div><strong>رقم:</strong> {{ s.product.product_number }}</div>
-                        <div><strong>اسم:</strong> {{ s.product.name }}</div>
-                        <div><strong>الكمية:</strong> {{ s.product.quantity }}</div>
-                        <div><strong>الحد الأدنى:</strong> {{ s.product.min_stock_threshold }}</div>
-                        <div><strong>اقترح إعادة طلب:</strong> <span class="badge">{{ s.reorder_qty }}</span></div>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
 
         {% if general_low_stock %}
         <div class="section watch">
@@ -90,83 +54,9 @@
                 {% endfor %}
             </div>
         </div>
-        {% endif %}
-
-        {% if overstock_items %}
-        <div class="section overstock">
-            <h2>📈 فائض المخزون</h2>
-            <div class="items">
-                {% for o in overstock_items %}
-                    <div class="item">
-                        <div><strong>رقم:</strong> {{ o.product.product_number }}</div>
-                        <div><strong>اسم:</strong> {{ o.product.name }}</div>
-                        <div><strong>الكمية:</strong> {{ o.warehouse }}</div>
-                        <div><strong>الحد الأدنى:</strong> {{ o.threshold }}</div>
-                        <div><strong>فائض عن {{ multiplier }}×:</strong> <span class="badge">{{ o.excess }}</span></div>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        {% if watchlist %}
-        <div class="section watch">
-            <h2>👀 قائمة متابعة</h2>
-            <div class="items">
-                {% for w in watchlist %}
-                    <div class="item">
-                        <div><strong>رقم:</strong> {{ w.product.product_number }}</div>
-                        <div><strong>اسم:</strong> {{ w.product.name }}</div>
-                        <div><strong>الكمية:</strong> {{ w.warehouse }}</div>
-                        <div><strong>الحد الأدنى:</strong> {{ w.threshold }}</div>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        {% if counts.anomaly %}
-        <div class="section overstock">
-            <h2>🚨 تنبيهات الشذوذ</h2>
-            <div style="margin-bottom:10px; color:#374151;">المعايير: تغيير كبير ≥ {{ policy.large_change_threshold }}، تكرار تغييرات خلال {{ policy.frequent_window_hours }} ساعة ≥ {{ policy.frequent_change_min_count }}, كميات سالبة</div>
-            {% if large_changes %}
-            <div class="items">
-                {% for a in large_changes %}
-                    <div class="item">
-                        <div><strong>رقم:</strong> {{ a.product_number }}</div>
-                        <div><strong>تغيير كبير:</strong> {{ a.change }}</div>
-                        <div><strong>قبل:</strong> {{ a.before }}</div>
-                        <div><strong>بعد:</strong> {{ a.after }}</div>
-                    </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            {% if frequent_changes %}
-            <div class="items">
-                {% for f in frequent_changes %}
-                    <div class="item">
-                        <div><strong>رقم:</strong> {{ f.product.product_number }}</div>
-                        <div><strong>اسم:</strong> {{ f.product.name }}</div>
-                        <div><strong>عدد تغييرات 24 ساعة:</strong> {{ f.count }}</div>
-                        <a href="/products/{{ f.product.id }}/" class="btn" style="margin-top:8px">فتح المنتج</a>
-                    </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            {% if negative_quantities %}
-            <div class="items">
-                {% for p in negative_quantities %}
-                    <div class="item">
-                        <div><strong>رقم:</strong> {{ p.product_number }}</div>
-                        <div><strong>اسم:</strong> {{ p.name }}</div>
-                        <div><strong>كمية:</strong> {{ p.quantity }}</div>
-                        <a href="/products/{{ p.id }}/" class="btn" style="margin-top:8px">فتح المنتج</a>
-                    </div>
-                {% endfor %}
-            </div>
-            {% endif %}
+        {% else %}
+        <div class="section" style="text-align:center; padding:40px; color:#64748b;">
+            <h3>✅ لا توجد منتجات منخفضة المخزون حالياً</h3>
         </div>
         {% endif %}
     </div>
@@ -215,23 +105,8 @@
         </div>
     </div>
 
-    <script>
-    (function(){
-        var mInp = document.getElementById('multiplier-input');
-        var btn = document.getElementById('apply-multiplier');
-        if (mInp && btn){
-            mInp.addEventListener('input', function(){
-                var m = parseInt(mInp.value || '2');
-                if (!m || m < 1) m = 2;
-                var base = window.location.pathname + '?';
-                var params = new URLSearchParams(window.location.search);
-                params.set('overstock_multiplier', m);
-                btn.href = base + params.toString();
-            });
-        }
-    })();
-    </script>
-    <script src="{% static 'js/notifications.js' %}"></script>
+
+
     <script src="{% static 'js/sidebar.js' %}"></script>
 </body>
 </html>

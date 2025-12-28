@@ -1,0 +1,192 @@
+{
+  "export_info": {
+    "date": "2025-12-04T00:00:00",
+    "version": "1.0",
+    "description": "بيانات منتجات تجريبية للاستيراد"
+  },
+  "warehouses": [],
+  "locations": [],
+  "products": [
+    {
+      "model": "inventory_app.product",
+      "pk": 1,
+      "fields": {
+        "product_number": "PRD-001",
+        "name": "حقيبة رياضية قطن",
+        "category": "حقائب",
+        "quantity": 120,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 2,
+      "fields": {
+        "product_number": "PRD-002",
+        "name": "شنطة يد جلد",
+        "category": "حقائب يد",
+        "quantity": 80,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 3,
+      "fields": {
+        "product_number": "PRD-003",
+        "name": "حقيبة ظهر سفر",
+        "category": "سفر",
+        "quantity": 60,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 4,
+      "fields": {
+        "product_number": "PRD-004",
+        "name": "حقيبة لابتوب مقاومة للماء",
+        "category": "تقنية",
+        "quantity": 40,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 5,
+      "fields": {
+        "product_number": "PRD-005",
+        "name": "حقيبة تسوق قابلة للطي",
+        "category": "تسوق",
+        "quantity": 150,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 6,
+      "fields": {
+        "product_number": "PRD-006",
+        "name": "حقيبة مدرسية قماش",
+        "category": "مدرسية",
+        "quantity": 90,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 7,
+      "fields": {
+        "product_number": "PRD-007",
+        "name": "شنطة يد حرير",
+        "category": "حقائب يد",
+        "quantity": 35,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 8,
+      "fields": {
+        "product_number": "PRD-008",
+        "name": "حقيبة رياضية نايلون",
+        "category": "حقائب",
+        "quantity": 110,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 9,
+      "fields": {
+        "product_number": "PRD-009",
+        "name": "حقيبة ظهر - يونيكورن",
+        "category": "ظهر",
+        "quantity": 25,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 10,
+      "fields": {
+        "product_number": "PRD-010",
+        "name": "حقيبة صغيرة كلاسيك",
+        "category": "كلاسيك",
+        "quantity": 55,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 11,
+      "fields": {
+        "product_number": "PRD-011",
+        "name": "شنطة يد بيضاء",
+        "category": "حقائب يد",
+        "quantity": 70,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 12,
+      "fields": {
+        "product_number": "PRD-012",
+        "name": "حقيبة سفر كبيرة",
+        "category": "سفر",
+        "quantity": 65,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 13,
+      "fields": {
+        "product_number": "PRD-013",
+        "name": "حقيبة لابتوب مقاومة للمطر",
+        "category": "تقنية",
+        "quantity": 45,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 14,
+      "fields": {
+        "product_number": "PRD-014",
+        "name": "حقيبة مدرسية فوم",
+        "category": "مدرسية",
+        "quantity": 85,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    },
+    {
+      "model": "inventory_app.product",
+      "pk": 15,
+      "fields": {
+        "product_number": "PRD-015",
+        "name": "شنطة يد بسلسلة ذهب",
+        "category": "حقائب يد",
+        "quantity": 30,
+        "created_at": "2025-12-04T20:40:00Z",
+        "updated_at": "2025-12-04T20:40:00Z"
+      }
+    }
+  ],
+  "audit_logs": []
+}

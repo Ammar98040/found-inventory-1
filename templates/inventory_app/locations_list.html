@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>قائمة الأماكن</title>
     {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/locations_grid.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
@@ -29,7 +30,7 @@
         </div>
 
         <div class="warehouse-info-header">
-            <h3>🏢 {{ warehouse.name }}</h3>
+            <h3>🏢 إحصائيات المستودع</h3>
             <p style="margin: 0; opacity: 0.9;">
                 <strong>{{ warehouse.rows_count }}</strong> صف × <strong>{{ warehouse.columns_count }}</strong> عمود = 
                 <strong>{{ locations|length }}</strong> موقع

@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block title %}دمج الملفات{% endblock %}
+{% block page_title %}دمج ملفات المنتجات (Excel/JSON){% endblock %}
+{% block extra_styles %}
+<style>
+    .merge-container{max-width:1200px;margin:0 auto}
+    .merge-hero{background:linear-gradient(135deg,#22c55e 0%,#16a34a 100%);color:#fff;padding:20px;border-radius:16px;box-shadow:var(--shadow-lg);display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    .merge-hero-title{font-size:1.2rem;font-weight:800}
+    .merge-hero-sub{opacity:.95}
+    .mf-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+    .mf-col{grid-column:span 6}
+    .mf-col-full{grid-column:span 12}
+    .mf-card{background:#fff;border-radius:14px;box-shadow:var(--shadow-lg);padding:18px}
+    .mf-card-title{font-weight:800;margin-bottom:10px;color:var(--primary-color)}
+    .mf-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+    .mf-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+    .mf-input{border:2px solid var(--border-color);border-radius:10px;padding:8px 12px}
+    .mf-progress{height:6px;background:#e5e7eb;border-radius:999px;margin-top:10px;overflow:hidden}
+    .mf-progress-bar{height:100%;width:0;background:linear-gradient(135deg,#4f46e5 0%,#0ea5e9 100%)}
+    .mf-hint{color:#6b7280;font-size:.9rem}
+    .mf-upload-input{width:0;height:0;opacity:0;position:absolute}
+    .mf-upload-area{border:2px dashed #cbd5e1;border-radius:12px;padding:22px;text-align:center;background:#f8fafc;transition:.2s}
+    .mf-upload-area:hover{border-color:var(--primary-color);background:#f1f5f9}
+    .mf-upload-area.dragover{border-color:var(--primary-color);background:#eef2ff}
+    .mf-files{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .mf-file{background:#eef2ff;color:#0f172a;border-radius:999px;padding:6px 12px;font-size:.85rem}
+    .mf-summary{margin-top:12px;font-weight:700;color:#0f172a}
+    .mf-table-wrapper{margin-top:12px}
+    .mf-table-wrapper .table{width:100%}
+    .mf-table-wrapper{background:#fff;border-radius:12px;box-shadow:var(--shadow);overflow:auto;max-height:55vh}
+    .table thead th{position:sticky;top:0;background:#f8fafc;z-index:1}
+    .table tbody tr:nth-child(even){background:#f9fafb}
+    @media (max-width:992px){.mf-col{grid-column:span 12}}
+    @media (max-width:768px){.merge-hero{padding:16px}.merge-hero-title{font-size:1.05rem}}
+    @media (max-width:480px){.mf-actions{gap:8px}.mf-card{padding:14px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="merge-container">
+  {% csrf_token %}
+  <div class="merge-hero">
+      <div>
+          <div class="merge-hero-title">📦 دمج ملفات المنتجات</div>
+          <div class="merge-hero-sub">رفع وتحليل ملفات Excel/JSON، اكتشاف التكرارات وإصلاحها ثم التصدير</div>
+      </div>
+      <div class="badge">متجاوب</div>
+  </div>
+
+  <div class="mf-grid">
+    <div class="mf-col">
+      <div class="mf-card">
+        <div class="mf-card-title">الملفات</div>
+        <input type="file" id="files-input" class="mf-upload-input" multiple accept=".xlsx,.xls,.json" onchange="showSelectedFiles()">
+        <div class="mf-upload-area" id="upload-area" onclick="chooseFiles()">
+          <div style="font-size:2rem">📁</div>
+          <div style="font-weight:700">انقر لاختيار الملفات أو اسحبها هنا</div>
+          <div class="mf-hint">الصيغ المدعومة: .xlsx .xls .json</div>
+        </div>
+        <div class="mf-actions">
+          <button class="btn btn--sm btn--neutral" onclick="chooseFiles()">اختيار الملفات</button>
+          <button class="btn btn--sm btn--success" onclick="uploadFiles()">رفع ومعالجة</button>
+          <button class="btn btn--sm" onclick="downloadSample()">تحميل نموذج JSON</button>
+          <div id="upload-status" class="mf-hint"></div>
+        </div>
+        <div class="mf-progress"><div id="upload-progress" class="mf-progress-bar"></div></div>
+        <div id="selected-files" class="mf-files"></div>
+      </div>
+    </div>
+
+    <div class="mf-col">
+      <div class="mf-card">
+        <div class="mf-card-title">الإصلاح والتصدير</div>
+        <div class="mf-actions">
+          <label>طريقة الإصلاح:</label>
+          <select id="auto-fix">
+            <option value="merge">دمج الكميات للمتكرر</option>
+            <option value="rename">إعادة تسمية المتكرر</option>
+          </select>
+          <button class="btn btn--sm" onclick="processMerged()">تنفيذ الإصلاح</button>
+          <select id="export-format">
+            <option value="json">JSON</option>
+            <option value="excel">Excel</option>
+          </select>
+          <button class="btn btn--sm btn--primary" onclick="exportMerged()">تصدير الملف الموحد</button>
+        </div>
+        <div id="summary" class="mf-summary"></div>
+      </div>
+    </div>
+
+    <div class="mf-col-full">
+      <div class="mf-card">
+        <div class="mf-card-title">النتائج</div>
+        <div class="mf-toolbar">
+          <input id="filter-input" class="mf-input" placeholder="بحث بالاسم أو رقم المنتج">
+          <label class="mf-input" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="show-duplicates"> إظهار المكرر فقط</label>
+          <label class="mf-input" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="keep-order" checked> الحفاظ على ترتيب الملف</label>
+          <div class="mf-actions">
+            <button class="btn btn--sm" id="show-all-btn">الكل</button>
+            <button class="btn btn--sm" id="show-unique-btn">فريد</button>
+            <button class="btn btn--sm" id="show-dup-btn">متكرر</button>
+          </div>
+        </div>
+        <div id="results" class="mf-table-wrapper"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let uploadedItems=[];let consolidatedItems=[];let dragBound=false;let duplicatesMap={};let currentView='uploaded';let filterMode='all';
+function displayPN(it){return String(it.product_number||it.final_model||it.model||it.number||it.code||'').trim();}
+function getCSRFToken(){const el=document.querySelector('[name=csrfmiddlewaretoken]');if(el) return el.value;const c=document.cookie.split('; ').find(r=>r.startsWith('csrftoken='));return c?c.split('=')[1]:'';}
+function chooseFiles(){document.getElementById('files-input').click();}
+function showSelectedFiles(){const inp=document.getElementById('files-input');const box=document.getElementById('selected-files');if(!inp.files||inp.files.length===0){box.innerHTML='';return;}const chips=Array.from(inp.files).slice(0,12).map(f=>`<span class="mf-file">${f.name}</span>`).join('');box.innerHTML=chips;}
+function bindDragDrop(){if(dragBound) return;dragBound=true;const area=document.getElementById('upload-area');area.addEventListener('dragover',e=>{e.preventDefault();area.classList.add('dragover');});area.addEventListener('dragleave',()=>{area.classList.remove('dragover');});area.addEventListener('drop',e=>{e.preventDefault();area.classList.remove('dragover');const files=e.dataTransfer.files;document.getElementById('files-input').files=files;showSelectedFiles();});}
+async function uploadFiles(){const inp=document.getElementById('files-input');if(!inp.files||inp.files.length===0){alert('يرجى اختيار ملفات');return;}const fd=new FormData();Array.from(inp.files).forEach(f=>fd.append('files[]',f));document.getElementById('upload-status').textContent='جارٍ التحليل...';const bar=document.getElementById('upload-progress');bar.style.width='0%';const xhr=new XMLHttpRequest();xhr.open('POST','/api/merge-files/upload/');xhr.setRequestHeader('X-CSRFToken',getCSRFToken());xhr.setRequestHeader('X-Requested-With','XMLHttpRequest');xhr.setRequestHeader('Accept','application/json');xhr.upload.onprogress=function(e){if(e.lengthComputable){const p=Math.round(e.loaded/e.total*100);bar.style.width=p+'%';}};xhr.onreadystatechange=function(){if(xhr.readyState===4){bar.style.width='100%';if(xhr.status===403){alert('خطأ أمني (CSRF)، يرجى تحديث الصفحة والمحاولة مجددًا');return;}let data=null;try{data=JSON.parse(xhr.responseText);}catch(e){document.getElementById('upload-status').textContent='فشل قراءة الاستجابة';return;}if(!data||data.success===false){alert('خطأ: '+(data&&data.error||'تعذر المعالجة'));return;}uploadedItems=data.items||[];duplicatesMap=data.duplicates||{};currentView='uploaded';document.getElementById('summary').textContent=`إجمالي العناصر: ${data.counts.total} | الفريد: ${data.counts.unique} | المتكرر: ${data.counts.duplicates}`;applyFilterSort();document.getElementById('upload-status').textContent='تم التحليل';}};xhr.send(fd);} 
+function normalizeKey(s){return String(s||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();}
+function baseItems(){return currentView==='uploaded'?uploadedItems:consolidatedItems;}
+function applyFilterSort(){const q=(document.getElementById('filter-input').value||'').trim().toLowerCase();const keepOrder=document.getElementById('keep-order');const showDup=document.getElementById('show-duplicates');let items=baseItems().slice();if(q){items=items.filter(it=>String(it.name||'').toLowerCase().includes(q)||displayPN(it).toLowerCase().includes(q));}if(filterMode==='duplicates'||(showDup&&showDup.checked)){items=items.filter(it=>{const key=normalizeKey(it.product_number||displayPN(it));return duplicatesMap&&duplicatesMap[key];});}else if(filterMode==='unique'){items=items.filter(it=>{const key=normalizeKey(it.product_number||displayPN(it));return !(duplicatesMap&&duplicatesMap[key]);});}if(!(keepOrder&&keepOrder.checked)){items.sort((a,b)=>{const av=displayPN(a);const bv=displayPN(b);return av.localeCompare(bv);});}renderTable(items);} 
+function renderTable(items){const base=baseItems();const rows=items.map((it,idx)=>{const pn=displayPN(it);const key=normalizeKey(it.product_number||pn);const dup=duplicatesMap&&duplicatesMap[key];const mark=dup?'<span class=\"badge\" style=\"margin-right:6px;background:#f59e0b\">متكرر</span>':'';const qty=Number(it.quantity||0);const srcIdx=base.findIndex(o=>o===it);const actions=dup?`<div class=\"mf-actions\"><button class=\"btn btn--sm btn--danger\" onclick=\"deleteRow(${srcIdx})\">حذف الصف</button><button class=\"btn btn--sm btn--neutral\" onclick=\"autoEditRow(${srcIdx})\">تعديل تلقائي</button></div>`:'';return `<tr${dup?' style=\"background:#fff7ed\"':''}><td>${idx+1}</td><td>${mark}${pn}</td><td>${qty}</td><td style=\"color:#6b7280;\">${it.source||''}</td><td>${actions}</td></tr>`;}).join('');document.getElementById('results').innerHTML=`<table class=\"table\"><thead><tr><th>#</th><th>رقم المنتج</th><th>الكمية</th><th>المصدر</th><th>إجراءات</th></tr></thead><tbody>${rows}</tbody></table>`;}
+function recalcDuplicates(){const arr=baseItems();const groups={};arr.forEach(it=>{const pn=displayPN(it);const k=normalizeKey(it.product_number||pn);if(!k)return;groups[k]=(groups[k]||[]);groups[k].push(it);});duplicatesMap={};Object.keys(groups).forEach(k=>{if(groups[k].length>1){duplicatesMap[k]=groups[k];}});}
+function deleteRow(idx){const arr=currentView==='uploaded'?uploadedItems:consolidatedItems;if(idx<0||idx>=arr.length)return;arr.splice(idx,1);recalcDuplicates();applyFilterSort();}
+function autoEditRow(idx){const arr=currentView==='uploaded'?uploadedItems:consolidatedItems;if(idx<0||idx>=arr.length)return;const it=arr[idx];let basePN=displayPN(it);if(!basePN){basePN='ITEM';}let i=1;let candidate='';const existing=new Set(arr.map(x=>normalizeKey(displayPN(x)||x.product_number)));do{candidate=`${basePN}-FIX-${i}`;i++;}while(existing.has(normalizeKey(candidate)));it.product_number=candidate;recalcDuplicates();applyFilterSort();}
+async function processMerged(){if(!uploadedItems||uploadedItems.length===0){alert('لا توجد عناصر لمعالجتها');return;}const autoFix=document.getElementById('auto-fix').value;const res=await fetch('/api/merge-files/process/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken(),'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},credentials:'same-origin',body:JSON.stringify({items:uploadedItems,auto_fix:autoFix})});const data=await res.json();if(!data.success){alert('خطأ: '+(data.error||'تعذر الإصلاح'));return;}consolidatedItems=data.items||[];currentView='consolidated';document.getElementById('summary').textContent=`عناصر موحدة: ${data.total}`;applyFilterSort();} 
+async function exportMerged(){const fmt=document.getElementById('export-format').value;const fd=new FormData();fd.append('format',fmt);fd.append('items',JSON.stringify(consolidatedItems&&consolidatedItems.length?consolidatedItems:uploadedItems));fd.append('csrfmiddlewaretoken',getCSRFToken());const res=await fetch('/api/merge-files/export/',{method:'POST',body:fd,credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json'}});if(!res.ok){alert('تعذر التصدير');return;}const blob=await res.blob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fmt==='excel'?'merged_products.xlsx':'merged_products.json';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);} 
+function downloadSample(){const sample=[
+  {product_number:'ABC123',name:'منتج 1',quantity:10},
+  {product_number:'XYZ555',name:'منتج 2',quantity:5},
+  {product_number:'ABC123',name:'منتج 1 نسخة',quantity:3}
+];const blob=new Blob([JSON.stringify(sample,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='sample_products.json';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);} 
+function updateModeButtons(){const bAll=document.getElementById('show-all-btn');const bUni=document.getElementById('show-unique-btn');const bDup=document.getElementById('show-dup-btn');[bAll,bUni,bDup].forEach(b=>{if(!b) return;b.classList.remove('btn--primary');});if(filterMode==='all'&&bAll){bAll.classList.add('btn--primary');}if(filterMode==='unique'&&bUni){bUni.classList.add('btn--primary');}if(filterMode==='duplicates'&&bDup){bDup.classList.add('btn--primary');}}
+document.addEventListener('DOMContentLoaded',function(){bindDragDrop();['filter-input','show-duplicates','keep-order'].forEach(id=>{const el=document.getElementById(id);if(el) el.addEventListener('input',applyFilterSort);if(el) el.addEventListener('change',function(){if(id==='show-duplicates'){filterMode=this.checked?'duplicates':'all';updateModeButtons();}applyFilterSort();});});const bAll=document.getElementById('show-all-btn');const bUni=document.getElementById('show-unique-btn');const bDup=document.getElementById('show-dup-btn');if(bAll){bAll.addEventListener('click',function(){filterMode='all';const chk=document.getElementById('show-duplicates');if(chk){chk.checked=false;}updateModeButtons();applyFilterSort();});}if(bUni){bUni.addEventListener('click',function(){filterMode='unique';const chk=document.getElementById('show-duplicates');if(chk){chk.checked=false;}updateModeButtons();applyFilterSort();});}if(bDup){bDup.addEventListener('click',function(){filterMode='duplicates';const chk=document.getElementById('show-duplicates');if(chk){chk.checked=true;}updateModeButtons();applyFilterSort();});}updateModeButtons();});
+</script>
+{% endblock %}

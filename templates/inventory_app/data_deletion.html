@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>حذف البيانات</title>
     {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
     <link rel="stylesheet" href="{% static 'css/product_buttons.css' %}">
@@ -365,15 +366,20 @@
     </div>
 
     <!-- نموذج تأكيد الحذف -->
-    <div id="passwordModal">
-        <div class="modal-content">
-            <h3>⚠️ تأكيد الحذف</h3>
-            <p>هل أنت متأكد من حذف البيانات المحددة؟ هذا الإجراء لا يمكن التراجع عنه!</p>
-            <div class="modal-buttons">
-                <button class="btn btn--sm btn--danger" onclick="executeDeletion()">
-                    <span>نعم، احذف</span>
-                </button>
-                <button class="btn btn--sm btn--neutral" onclick="closeModal()">
+        <div id="passwordModal">
+            <div class="modal-content">
+                <h3>⚠️ تأكيد الحذف</h3>
+                <p>هل أنت متأكد من حذف البيانات المحددة؟ هذا الإجراء لا يمكن التراجع عنه!</p>
+                <div style="margin: 10px 0;">
+                    <label for="deletionPassword" style="display:block; font-weight:600; margin-bottom:6px; color:#334155;">كلمة مرور الحذف</label>
+                    <input type="password" id="deletionPassword" placeholder="أدخل كلمة المرور" autocomplete="off">
+                    <small style="color:#ef4444; display:none;" id="passwordError">✗ كلمة المرور مطلوبة</small>
+                </div>
+                <div class="modal-buttons">
+                    <button class="btn btn--sm btn--danger" onclick="executeDeletion()">
+                        <span>نعم، احذف</span>
+                    </button>
+                    <button class="btn btn--sm btn--neutral" onclick="closeModal()">
                     <span>إلغاء</span>
                 </button>
             </div>
@@ -408,6 +414,15 @@
         }
 
         function executeDeletion() {
+            const pwdInput = document.getElementById('deletionPassword');
+            const pwdError = document.getElementById('passwordError');
+            const pwd = (pwdInput.value || '').trim();
+            if (!pwd) {
+                pwdError.style.display = 'inline';
+                pwdInput.focus();
+                return;
+            }
+            pwdError.style.display = 'none';
             // جمع البيانات المحددة
             const data = {
                 delete_products: document.getElementById('delete_products').checked,
@@ -418,7 +433,8 @@
                 delete_orders: document.getElementById('delete_orders').checked,
                 delete_returns: document.getElementById('delete_returns').checked,
                 delete_user_profiles: document.getElementById('delete_user_profiles').checked,
-                delete_user_activity_logs: document.getElementById('delete_user_activity_logs').checked
+                delete_user_activity_logs: document.getElementById('delete_user_activity_logs').checked,
+                password: pwd
             };
             
             // إرسال الطلب

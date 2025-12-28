@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff4d4d;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#990000;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="2" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+    <style>
+      .heart {
+        transform-origin: center;
+        transform-box: fill-box;
+        animation: heartbeat 1.5s ease-in-out infinite;
+      }
+      @keyframes heartbeat {
+        0% { transform: scale(1); }
+        15% { transform: scale(1.1); }
+        30% { transform: scale(1); }
+        45% { transform: scale(1.1); }
+        60% { transform: scale(1); }
+        100% { transform: scale(1); }
+      }
+    </style>
+  </defs>
+  <!-- Heart Shape -->
+  <path class="heart" d="M50 88 C 10 60 0 40 0 25 C 0 10 15 0 35 0 C 45 0 50 10 50 10 C 50 10 55 0 65 0 C 85 0 100 10 100 25 C 100 40 90 60 50 88 Z" fill="url(#grad1)" filter="url(#shadow)"/>
+</svg>

@@ -14,18 +14,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # يتم تحميل SECRET_KEY من ملف .env فقط (غير موجود في Git)
-SECRET_KEY = config('SECRET_KEY')
+# إضافة قيمة افتراضية آمنة للتطوير لتفادي فشل التشغيل بدون .env
+SECRET_KEY = config('SECRET_KEY', default='dev-secret-key-change-this')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 # ALLOWED_HOSTS - يتم تحميلها من ملف .env
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost').split(',')
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost,0.0.0.0').split(',')
 
 # إعدادات CSRF للمحلي فقط
 CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://localhost:8000',
+    'http://0.0.0.0:8000',
 ]
 
 # إعدادات تسجيل الدخول
@@ -49,6 +51,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Optimized for static files in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -81,35 +84,34 @@ WSGI_APPLICATION = 'inventory_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# قاعدة بيانات PostgreSQL
-# جميع معلومات الاتصال محمية في ملف .env (غير موجود في Git)
-# يجب تحديث ملف .env بمعلومات قاعدة البيانات الصحيحة
+# قاعدة البيانات
+# دعم التبديل السهل بين PostgreSQL و SQLite عبر متغير USE_SQLITE
+USE_SQLITE = config('USE_SQLITE', default=False, cast=bool)
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
-        # Database connection pooling for performance
-        'CONN_MAX_AGE': 600,  # Keep connections alive for 10 minutes
-        'OPTIONS': {
-            'connect_timeout': 10,
-        },
+if USE_SQLITE:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
-
-# قاعدة بيانات SQLite للتطوير (معطلة - يتم استخدام PostgreSQL)
-# لاستخدام SQLite للتطوير المحلي، قم بتعليق كود PostgreSQL أعلاه وإلغاء تعليق الكود التالي:
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
+else:
+    # قاعدة بيانات PostgreSQL (للإنتاج)
+    # جميع معلومات الاتصال محمية في ملف .env (غير موجود في Git)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME'),
+            'USER': config('DB_USER'),
+            'PASSWORD': config('DB_PASSWORD'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {
+                'connect_timeout': 10,
+            },
+        }
+    }
 
 
 # Password validation
@@ -149,6 +151,9 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Whitenoise storage for better compression and caching
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -206,6 +211,9 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 # Password settings
 PASSWORD_RESET_TIMEOUT = 3600  # ساعة واحدة
+
+# كلمة مرور تصفير الكميات (اختيارية - تُحمّل من .env)
+RESET_PASSWORD = config('RESET_PASSWORD', default=None)
 
 # Rate limiting settings
 RATELIMIT_ENABLE = config('RATELIMIT_ENABLE', default=True, cast=bool)
@@ -316,4 +324,3 @@ import os
 LOGS_DIR = BASE_DIR / 'logs'
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
-

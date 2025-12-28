@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تفاصيل الطلبية {{ order.order_number }}</title>
     {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     
     <style>
@@ -15,6 +16,16 @@
             margin-bottom: 30px;
             flex-wrap: wrap;
             gap: 15px;
+        }
+        .detail-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .detail-actions .btn {
+            padding: 10px 16px;
+            font-size: 0.95rem;
         }
         
         .order-info {
@@ -81,6 +92,9 @@
                 flex-direction: column;
                 gap: 5px;
             }
+            .detail-actions .btn {
+                flex: 1 1 100%;
+            }
         }
     </style>
 </head>
@@ -126,6 +140,16 @@
             </div>
             {% endif %}
         </div>
+        <div class="detail-actions">
+            <a href="{% url 'inventory_app:export_order_pdf' order.id %}" class="btn btn-primary">
+                <span class="btn-icon">📄</span>
+                PDF
+            </a>
+            <button class="btn btn-secondary" onclick="window.print()">
+                <span class="btn-icon">🖨️</span>
+                طباعة
+            </button>
+        </div>
         
         <div class="products-table">
             <h2 style="margin-bottom: 20px;">المنتجات في هذه الطلبية:</h2>
@@ -154,4 +178,12 @@
         </div>
     </div>
 </body>
+<script>
+    (function(){
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('print') === '1') {
+            setTimeout(function(){ window.print(); }, 300);
+        }
+    })();
+</script>
 </html>

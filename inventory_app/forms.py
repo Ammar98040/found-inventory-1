@@ -95,6 +95,11 @@ class RegisterStaffForm(forms.Form):
             'placeholder': '05xxxxxxxx',
         })
     )
+    user_type = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+        initial='staff'
+    )
     password = forms.CharField(
         label='كلمة المرور',
         widget=forms.PasswordInput(attrs={
@@ -210,11 +215,12 @@ class ProductForm(forms.ModelForm):
     """نموذج المنتج مع التحقق من الأمان"""
     class Meta:
         model = Product
-        fields = ['product_number', 'name', 'category', 'description', 'quantity', 'location']
+        fields = ['product_number', 'name', 'category', 'price', 'description', 'quantity', 'location']
         labels = {
             'product_number': 'رقم المنتج',
             'name': 'اسم المنتج',
             'category': 'الفئة',
+            'price': 'السعر',
             'description': 'الوصف',
             'quantity': 'الكمية',
             'location': 'الموقع',
@@ -231,6 +237,12 @@ class ProductForm(forms.ModelForm):
             'category': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'الفئة',
+            }),
+            'price': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0.00',
+                'step': '0.01',
+                'min': '0',
             }),
             'description': forms.Textarea(attrs={
                 'class': 'form-control',

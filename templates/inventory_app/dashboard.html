@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة التحكم - Dashboard</title>
     {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
     <link rel="stylesheet" href="{% static 'css/quick_search.css' %}">
-    <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+
     <style>
         .dashboard-grid {
             display: grid;
@@ -187,8 +188,51 @@
             </div>
         </div>
 
+        <!-- تقارير الذكاء الاصطناعي -->
+        {% if latest_ai_reports %}
+        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); margin-top: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; font-size: 1.5rem;">🧠 تقارير الذكاء الاصطناعي الأخيرة</h2>
+                <a href="/inventory-insights/" style="color: var(--primary-color); text-decoration: none; font-weight: bold;">عرض كل الرؤى →</a>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb; color: #4b5563;">التاريخ</th>
+                            <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb; color: #4b5563;">الفترة</th>
+                            <th style="text-align: center; padding: 12px; border-bottom: 2px solid #e5e7eb; color: #4b5563;">الطلبات</th>
+                            <th style="text-align: center; padding: 12px; border-bottom: 2px solid #e5e7eb; color: #4b5563;">العناصر</th>
+                            <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb; color: #4b5563;">أهم الرؤى</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for report in latest_ai_reports %}
+                        <tr>
+                            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">{{ report.created_at|date:"Y-m-d H:i" }}</td>
+                            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">{{ report.period_hours }} ساعات</td>
+                            <td style="text-align: center; padding: 12px; border-bottom: 1px solid #e5e7eb;">{{ report.total_orders }}</td>
+                            <td style="text-align: center; padding: 12px; border-bottom: 1px solid #e5e7eb;">{{ report.total_items }}</td>
+                            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
+                                <ul style="margin: 0; padding-right: 20px; font-size: 0.9em; color: #4b5563;">
+                                    {% for insight in report.insights_data|slice:":2" %}
+                                    <li style="margin-bottom: 4px;">{{ insight }}</li>
+                                    {% empty %}
+                                    <li>لا توجد ملاحظات هامة</li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- إجراءات سريعة -->
-        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: var(--shadow-lg); margin-top: 30px;">
+        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); margin-top: 30px;">
             <h2 style="margin-bottom: 20px;">⚡ إجراءات سريعة</h2>
             <div class="quick-actions">
                 <a href="/" class="action-btn">
@@ -322,7 +366,13 @@
     
     <div id="main-sidebar">
         <div class="sidebar-header">
-            <h2>🧭 القوائم</h2>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <img src="{% static 'img/favicon.svg' %}" alt="شعار" style="width: 32px; height: 32px;">
+                <div>
+                    <h2 style="font-size: 1.1rem; margin-bottom: 2px;">قلب العرب</h2>
+                    <div style="font-size: 0.75rem; color: #9ca3af; font-weight: normal;">نظام إدارة المخزون</div>
+                </div>
+            </div>
             <button class="sidebar-close" onclick="toggleSidebar()">×</button>
         </div>
         
@@ -493,7 +543,7 @@
     <script src="{% static 'js/sidebar.js' %}"></script>
     <script src="{% static 'js/auto_refresh.js' %}"></script>
     <script src="{% static 'js/quick_search.js' %}"></script>
-    <script src="{% static 'js/notifications.js' %}"></script>
+
     
     <script>
         // اختبار الإشعارات عند تحميل الصفحة (يمكن حذفها لاحقاً)

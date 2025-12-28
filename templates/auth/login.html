@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تسجيل الدخول - قلب العرب</title>
+    {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <style>
         * {
             margin: 0;
@@ -422,7 +424,7 @@
     <!-- حاوية تسجيل الدخول -->
     <div class="login-container">
         <div class="logo-container">
-            <div class="logo-icon">❤️</div>
+            <img src="{% static 'img/favicon.svg' %}" alt="شعار قلب العرب" class="logo-icon" style="width: 120px; height: 120px;">
             <div class="logo-text">قلب العرب</div>
             <div class="logo-subtitle">نظام إدارة المخزون</div>
         </div>

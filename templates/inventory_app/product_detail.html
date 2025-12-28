@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تفاصيل المنتج - {{ product.product_number }}</title>
     {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/product_buttons.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
@@ -70,10 +71,10 @@
             <h2 style="margin-bottom: 20px;">📋 المعلومات</h2>
             
             {% if product.image %}
-            <div class="info-row" style="margin-bottom: 20px;">
-                <div style="text-align: center; padding: 20px; background: #f8fafc; border-radius: 8px;">
+            <div class="info-row" style="margin-bottom: 20px; display: block;">
+                <div style="text-align: center; padding: 10px; background: #f8fafc; border-radius: 8px; width: 100%; box-sizing: border-box;">
                     <img src="{{ product.image.url }}" alt="{{ product.name }}" 
-                         style="max-width: 300px; max-height: 300px; border-radius: 8px; border: 2px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                         style="max-width: 100%; height: auto; max-height: 300px; object-fit: contain; border-radius: 8px; border: 2px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 </div>
             </div>
             {% endif %}
@@ -87,12 +88,18 @@
                 <div class="info-value">{{ product.name }}</div>
             </div>
             <div class="info-row">
-                <div class="info-label">الفئة:</div>
-                <div class="info-value">{{ product.category|default:"-" }}</div>
-            </div>
-            <div class="info-row">
                 <div class="info-label">الكمية:</div>
                 <div class="info-value">{{ product.quantity }}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">السعر:</div>
+                <div class="info-value">
+                    {% if product.price %}
+                        <strong style="color: #059669;">{{ product.price }} ريال</strong>
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
             </div>
             <div class="info-row">
                 <div class="info-label">الأصلية (مرجع):</div>
@@ -169,6 +176,8 @@
             </div>
         </div>
     </div>
+
+
 
     <!-- Sidebar -->
     <button id="sidebar-toggle" onclick="toggleSidebar()">☰</button>
@@ -367,7 +376,6 @@
         });
     </script>
     <script src="{% static 'js/quick_search.js' %}"></script>
-    <script src="{% static 'js/notifications.js' %}"></script>
+
 </body>
 </html>
-

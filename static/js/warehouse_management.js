@@ -56,7 +56,33 @@ function updateGridDisplay() {
         headerCell.className = 'grid-cell grid-cell-header';
         headerCell.style.width = '50px';
         headerCell.style.height = '50px';
-        headerCell.textContent = col;
+        headerCell.style.display = 'flex';
+        headerCell.style.flexDirection = 'column';
+        headerCell.style.alignItems = 'center';
+        headerCell.style.justifyContent = 'center';
+        
+        const colLabel = document.createElement('span');
+        colLabel.textContent = col;
+        headerCell.appendChild(colLabel);
+        
+        // زر الترتيب للعمود (فقط إذا كان هناك صفوف)
+        if (currentGrid.rows > 1) {
+            const compactBtn = document.createElement('button');
+            compactBtn.innerHTML = '⬆️';
+            compactBtn.title = 'إعادة ترتيب العمود (ملء الفراغات)';
+            compactBtn.style.fontSize = '0.7rem';
+            compactBtn.style.border = 'none';
+            compactBtn.style.background = 'transparent';
+            compactBtn.style.cursor = 'pointer';
+            compactBtn.style.padding = '0';
+            compactBtn.style.marginTop = '2px';
+            compactBtn.onclick = function(e) { 
+                e.stopPropagation();
+                compactColumn(col); 
+            };
+            headerCell.appendChild(compactBtn);
+        }
+        
         headerRow.appendChild(headerCell);
     }
     
@@ -73,7 +99,33 @@ function updateGridDisplay() {
         rowHeader.className = 'grid-cell grid-cell-header';
         rowHeader.style.width = '50px';
         rowHeader.style.height = '50px';
-        rowHeader.textContent = row;
+        rowHeader.style.display = 'flex';
+        rowHeader.style.flexDirection = 'column';
+        rowHeader.style.alignItems = 'center';
+        rowHeader.style.justifyContent = 'center';
+        
+        const rowLabel = document.createElement('span');
+        rowLabel.textContent = row;
+        rowHeader.appendChild(rowLabel);
+        
+        // زر الترتيب (فقط إذا كان هناك أعمدة)
+        if (currentGrid.columns > 1) {
+            const compactBtn = document.createElement('button');
+            compactBtn.innerHTML = '⬅️';
+            compactBtn.title = 'إعادة ترتيب الصف (ملء الفراغات)';
+            compactBtn.style.fontSize = '0.7rem';
+            compactBtn.style.border = 'none';
+            compactBtn.style.background = 'transparent';
+            compactBtn.style.cursor = 'pointer';
+            compactBtn.style.padding = '0';
+            compactBtn.style.marginTop = '2px';
+            compactBtn.onclick = function(e) { 
+                e.stopPropagation();
+                compactRow(row); 
+            };
+            rowHeader.appendChild(compactBtn);
+        }
+        
         rowDiv.appendChild(rowHeader);
         
         // الخلايا
@@ -354,5 +406,159 @@ function hideError() {
     if (errorEl) {
         errorEl.style.display = 'none';
     }
+}
+
+// إعادة ترتيب الصف
+async function compactRow(rowNumber) {
+    if (!confirm(`هل أنت متأكد من إعادة ترتيب الصف ${rowNumber}؟\nسيتم نقل المنتجات لملء الفراغات من اليمين إلى اليسار (باتجاه العمود 1).`)) {
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const response = await fetch('/api/compact-row/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                row: rowNumber
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            await refreshGrid();
+            
+            // إظهار رسالة النجاح مع زر التراجع
+            if (data.can_undo) {
+                showUndoNotification(data.message || 'تم إعادة الترتيب بنجاح');
+            } else {
+                alert(data.message || 'تم إعادة الترتيب بنجاح');
+            }
+        } else {
+            showError(data.error || 'حدث خطأ أثناء إعادة الترتيب');
+        }
+        
+    } catch (error) {
+        showError('حدث خطأ: ' + error.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+// إعادة ترتيب العمود
+async function compactColumn(colNumber) {
+    if (!confirm(`هل أنت متأكد من إعادة ترتيب العمود ${colNumber}؟\nسيتم نقل المنتجات لملء الفراغات من الأعلى إلى الأسفل (باتجاه الصف 1).`)) {
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const response = await fetch('/api/compact-column/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                column: colNumber
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            await refreshGrid();
+            
+            // إظهار رسالة النجاح مع زر التراجع
+            if (data.can_undo) {
+                showUndoNotification(data.message || 'تم إعادة الترتيب بنجاح');
+            } else {
+                alert(data.message || 'تم إعادة الترتيب بنجاح');
+            }
+        } else {
+            showError(data.error || 'حدث خطأ أثناء إعادة الترتيب');
+        }
+        
+    } catch (error) {
+        showError('حدث خطأ: ' + error.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+// التراجع عن آخر عملية
+async function revertCompaction() {
+    showLoading();
+    
+    try {
+        const response = await fetch('/api/revert-compaction/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            await refreshGrid();
+            alert(data.message || 'تم التراجع بنجاح');
+            
+            // إخفاء إشعار التراجع
+            const undoEl = document.getElementById('undo-notification');
+            if (undoEl) undoEl.style.display = 'none';
+        } else {
+            showError(data.error || 'حدث خطأ أثناء التراجع');
+        }
+        
+    } catch (error) {
+        showError('حدث خطأ: ' + error.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+// عرض إشعار التراجع
+function showUndoNotification(message) {
+    let undoEl = document.getElementById('undo-notification');
+    
+    if (!undoEl) {
+        undoEl = document.createElement('div');
+        undoEl.id = 'undo-notification';
+        undoEl.style.position = 'fixed';
+        undoEl.style.bottom = '20px';
+        undoEl.style.left = '50%';
+        undoEl.style.transform = 'translateX(-50%)';
+        undoEl.style.backgroundColor = '#333';
+        undoEl.style.color = 'white';
+        undoEl.style.padding = '15px 25px';
+        undoEl.style.borderRadius = '8px';
+        undoEl.style.zIndex = '1000';
+        undoEl.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+        undoEl.style.display = 'flex';
+        undoEl.style.alignItems = 'center';
+        undoEl.style.gap = '15px';
+        
+        document.body.appendChild(undoEl);
+    }
+    
+    undoEl.innerHTML = `
+        <span>${message}</span>
+        <button onclick="revertCompaction()" style="background: #ef4444; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">تراجع ↩️</button>
+        <button onclick="document.getElementById('undo-notification').style.display='none'" style="background: transparent; color: #aaa; border: none; font-size: 1.2rem; cursor: pointer; margin-right: 5px;">&times;</button>
+    `;
+    
+    undoEl.style.display = 'flex';
+    
+    // إخفاء تلقائي بعد 10 ثواني
+    setTimeout(() => {
+        if (undoEl.style.display !== 'none') {
+            undoEl.style.display = 'none';
+        }
+    }, 10000);
 }
 

@@ -135,37 +135,35 @@ function parseSearchInput(input) {
     const products = [];
     const seenNumbers = new Set();
     const duplicates = [];
-    const invalidLines = [];
-    const numericPattern = /^\d+(?::\d+)?$/;
+    const invalidQtyLines = [];
 
     for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
-        if (!numericPattern.test(trimmed)) {
-            invalidLines.push(trimmed);
-            continue;
+
+        let productNumber = trimmed;
+        let quantity = 0;
+
+        const lastColon = trimmed.lastIndexOf(':');
+        if (lastColon > 0) {
+            productNumber = trimmed.slice(0, lastColon).trim();
+            const quantityStr = trimmed.slice(lastColon + 1).trim();
+            const parsed = parseQuantity(quantityStr);
+            if (Number.isNaN(parsed)) {
+                invalidQtyLines.push(trimmed);
+            } else {
+                quantity = parsed;
+            }
         }
 
-        let productNumber;
-        if (trimmed.includes(':')) {
-            const [productNum, quantityStr] = trimmed.split(':');
-            productNumber = productNum.trim();
-            const quantity = parseQuantity(quantityStr.trim());
-            if (seenNumbers.has(productNumber)) {
-                duplicates.push(productNumber);
-                continue;
-            }
-            seenNumbers.add(productNumber);
-            products.push({ product_number: productNumber, quantity });
-        } else {
-            productNumber = trimmed;
-            if (seenNumbers.has(productNumber)) {
-                duplicates.push(productNumber);
-                continue;
-            }
-            seenNumbers.add(productNumber);
-            products.push({ product_number: productNumber, quantity: 0 });
+        if (!productNumber) continue;
+
+        if (seenNumbers.has(productNumber)) {
+            duplicates.push(productNumber);
+            continue;
         }
+        seenNumbers.add(productNumber);
+        products.push({ product_number: productNumber, quantity });
     }
 
     if (duplicates.length > 0) {
@@ -174,8 +172,8 @@ function parseSearchInput(input) {
         showWarning(uniqueDuplicates);
     }
 
-    if (invalidLines.length > 0) {
-        alert(`❌ صيغة غير صحيحة، استخدم: رقم أو رقم:رقم فقط\nالأسطر غير الصالحة:\n${invalidLines.join('\n')}`);
+    if (invalidQtyLines.length > 0) {
+        alert(`❌ تم تجاهل الكمية غير الصحيحة وسيتم اعتبارها 0:\n${invalidQtyLines.join('\n')}`);
     }
 
     return { products };
@@ -235,32 +233,6 @@ function createProductCard(product, index) {
     }
     
     let locationsHtml = '';
-    if (product.found && product.locations && product.locations.length > 0) {
-        locationsHtml = '<div class="locations-list">';
-        locationsHtml += '<h4>📍 الأماكن:</h4>';
-        
-        product.locations.forEach((location, idx) => {
-            locationsHtml += `
-                <div class="location-item">
-                    <div class="location-info">
-                        <div class="location-id">${location.full_location}</div>
-                        ${location.notes ? `<div class="location-details" style="color: #64748b; font-size: 0.85rem; margin-top: 5px; padding: 8px; background: #f1f5f9; border-radius: 6px; border-right: 3px solid #667eea;">
-                            📝 ${location.notes}
-                        </div>` : ''}
-                    </div>
-                    <div class="location-actions">
-                        <button onclick="highlightLocation(${location.row}, ${location.column})">
-                            🔍 عرض على الخريطة
-                        </button>
-                    </div>
-                </div>
-            `;
-        });
-        
-        locationsHtml += '</div>';
-    } else if (product.found) {
-        locationsHtml = '<p style="color: var(--error-color);">لا يوجد مواقع مسجلة لهذا المنتج</p>';
-    }
     
     // معلومات الكمية
     let quantityInfo = '';
@@ -315,6 +287,38 @@ function createProductCard(product, index) {
         suggestionsHtml += '</ul></div>';
     }
 
+    const hasLocation = product.found && product.locations && product.locations.length > 0;
+    const firstLocation = hasLocation ? product.locations[0] : null;
+    const findOnMapBtn = hasLocation ? `
+        <button 
+            class="btn btn-primary" 
+            style="margin-right: 8px;"
+            onclick="ensureGridAndHighlight(${firstLocation.row}, ${firstLocation.column})">
+            عرض على الخريطة 🔍
+        </button>
+    ` : '';
+
+    if (product.found) {
+        if (hasLocation) {
+            const locText = `R${firstLocation.row}C${firstLocation.column}`;
+            locationsHtml = `
+                <div style="background:#ecfeff; padding:12px; border-radius:8px; margin:10px 0; border-right:4px solid #1d4ed8;">
+                    <div style="color:#0f172a; font-weight:600; margin-bottom:6px;">الأماكن:</div>
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <span style="background:#e0e7ff; color:#1e40af; padding:4px 8px; border-radius:6px; font-weight:700;">${locText}</span>
+                        ${findOnMapBtn}
+                    </div>
+                </div>
+            `;
+        } else {
+            locationsHtml = `
+                <div style="color:#ef4444; font-weight:600; margin-top:8px;">
+                    لا يوجد مواقع مسجلة لهذا المنتج
+                </div>
+            `;
+        }
+    }
+
     card.innerHTML = `
         <div class="product-header">
             <div class="product-info" style="display: flex; align-items: center; gap: 10px; flex: 1;">
@@ -328,12 +332,13 @@ function createProductCard(product, index) {
                         <span class="product-number">${product.product_number}</span>
                         ${product.name ? `<span class="product-name"> - ${product.name}</span>` : ''}
                     </h3>
-                    ${product.category ? `<p style="color: var(--text-secondary); font-size: 0.85rem; margin: 3px 0;">فئة: ${product.category}</p>` : ''}
                 </div>
             </div>
-            <span class="status ${product.found ? 'found' : 'not-found'}" style="font-size: 0.85rem;">
-                ${product.found ? '✓ موجود' : '✗ غير موجود'}
-            </span>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="status ${product.found ? 'found' : 'not-found'}" style="font-size: 0.85rem;">
+                    ${product.found ? '✓ موجود' : '✗ غير موجود'}
+                </span>
+            </div>
         </div>
         ${quantityInfo}
         ${locationsHtml}
@@ -347,6 +352,19 @@ function createProductCard(product, index) {
     }, index * 50);
     
     return card;
+}
+
+// ضمان رسم الخريطة أولاً ثم إبراز الموقع المطلوب
+function ensureGridAndHighlight(row, column) {
+    const gridContainer = document.getElementById('warehouse-grid');
+    if (!gridContainer || gridContainer.children.length === 0) {
+        try {
+            drawWarehouse(currentResults);
+        } catch (e) {}
+        setTimeout(() => highlightLocation(row, column), 200);
+    } else {
+        highlightLocation(row, column);
+    }
 }
 
 function useSuggestion(originalNumber, suggestedNumber, requestedQty) {
@@ -459,6 +477,7 @@ async function drawWarehouse(results) {
     
     if (foundProducts.length === 0) {
         warehouseView.style.display = 'none';
+        try { renderLocationsTable(results); } catch (e) {}
         return;
     }
     
@@ -838,10 +857,28 @@ async function confirmSelectedProducts() {
     }
     
     try {
+        // التحقق من حالة الاتصال
+        if (typeof offlineManager !== 'undefined' && !offlineManager.isOnline) {
+            await offlineManager.queueOrder({ 
+                products: selectedProducts, 
+                recipient_name: recipientName 
+            });
+            
+            // إزالة المنتجات المأخوذة (محاكاة النجاح)
+            selectedProducts.forEach(product => {
+                const checkbox = document.getElementById(`product-${product.index}`);
+                if (checkbox) checkbox.checked = false;
+            });
+            selectedProducts = [];
+            updateConfirmButton();
+            return;
+        }
+
         const response = await fetch('/api/confirm-products/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': (typeof offlineManager !== 'undefined') ? offlineManager.getCsrfToken() : ''
             },
             body: JSON.stringify({ products: selectedProducts, recipient_name: recipientName })
         });
@@ -869,6 +906,27 @@ async function confirmSelectedProducts() {
             alert('✗ خطأ: ' + (data.error || 'حدث خطأ'));
         }
     } catch (error) {
+        console.error('Confirmation error:', error);
+        
+        // في حالة خطأ الشبكة، نعرض خيار الحفظ المحلي
+        if (typeof offlineManager !== 'undefined') {
+            const confirmed = confirm('تعذر الاتصال بالخادم. هل تريد حفظ الطلب محلياً ليتم إرساله عند عودة الاتصال؟');
+            if (confirmed) {
+                await offlineManager.queueOrder({ 
+                    products: selectedProducts, 
+                    recipient_name: recipientName 
+                });
+                
+                selectedProducts.forEach(product => {
+                    const checkbox = document.getElementById(`product-${product.index}`);
+                    if (checkbox) checkbox.checked = false;
+                });
+                selectedProducts = [];
+                updateConfirmButton();
+                return;
+            }
+        }
+        
         alert('✗ خطأ: ' + error.message);
     }
 }
@@ -1597,4 +1655,3 @@ function showNotification(message, type = 'info') {
         }, 300);
     }, 3000);
 }
-

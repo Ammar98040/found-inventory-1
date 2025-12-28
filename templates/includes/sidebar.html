@@ -5,7 +5,13 @@
 
 <div id="main-sidebar">
     <div class="sidebar-header">
-        <h2>🧭 القوائم</h2>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <img src="{% static 'img/favicon.svg' %}" alt="شعار" style="width: 32px; height: 32px;">
+            <div>
+                <h2 style="font-size: 1.1rem; margin-bottom: 2px;">قلب العرب</h2>
+                <div style="font-size: 0.75rem; color: #9ca3af; font-weight: normal;">نظام إدارة المخزون</div>
+            </div>
+        </div>
         <button class="sidebar-close" onclick="toggleSidebar()">×</button>
     </div>
     
@@ -66,6 +72,10 @@
                 <span class="icon">↩️</span>
                 <span class="text">المرتجعات</span>
             </a>
+            <a href="/analytics/" class="sidebar-link">
+                <span class="icon">📈</span>
+                <span class="text">التحليلات الذكية</span>
+            </a>
         </div>
         
         <div class="sidebar-section">
@@ -84,9 +94,17 @@
                 <span class="icon">💾</span>
                 <span class="text">النسخ الاحتياطي</span>
             </a>
+            <a href="/merge-files/" class="sidebar-link">
+                <span class="icon">🧩</span>
+                <span class="text">دمج الملفات</span>
+            </a>
             <a href="/data-deletion/" class="sidebar-link">
                 <span class="icon">🗑️</span>
                 <span class="text">حذف البيانات</span>
+            </a>
+            <a href="/inventory-insights/" class="sidebar-link">
+                <span class="icon">📦</span>
+                <span class="text">توصيات المخزون</span>
             </a>
         </div>
         
@@ -172,4 +190,3 @@
         </div>
     </div>
 </div>
-

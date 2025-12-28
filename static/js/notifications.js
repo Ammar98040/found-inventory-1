@@ -34,7 +34,7 @@ const Notifications = {
                 <div class="notification-title">${title}</div>
                 <div class="notification-message">${message}</div>
             </div>
-            <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+            <button class="notification-close" onclick="event.stopPropagation(); this.parentElement.remove()">×</button>
             <div class="notification-progress ${type}" style="animation-duration: ${duration}ms;"></div>
         `;
         
@@ -252,11 +252,8 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(r => r.json())
             .then(data => {
                 const l = data.low_stock_count || 0;
-                const r = data.reorder_count || 0;
-                const o = data.overstock_count || 0;
-                const w = data.watchlist_count || 0;
-                if ((l + r + o + w) > 0) {
-                    const msg = `إعادة الطلب: ${r} • فائض: ${o} • متابعة: ${w} • منخفض عام: ${l}`;
+                if (l > 0) {
+                    const msg = `منتجات منخفضة المخزون: ${l}`;
                     Notifications.warning('توصيات المخزون', msg, 3000);
                     setTimeout(() => {
                         const container = document.getElementById('notification-container');
@@ -280,4 +277,3 @@ window.Notifications = Notifications;
 window.ProductNotifications = ProductNotifications;
 window.LocationNotifications = LocationNotifications;
 window.WarehouseNotifications = WarehouseNotifications;
-

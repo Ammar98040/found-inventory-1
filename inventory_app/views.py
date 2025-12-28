@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db import transaction
 from django.db import models as db_models
-from .models import Product, Location, Warehouse, AuditLog, Order, ProductReturn, UserProfile, UserActivityLog, Container
+from .models import Product, Location, Warehouse, AuditLog, Order, ProductReturn, UserProfile, UserActivityLog, Container, AIInsightLog
 from .decorators import admin_required, staff_required, exclude_maintenance, exclude_admin_dashboard, get_user_type, is_admin
 from .forms import LoginForm, RegisterStaffForm, ProductForm, EditStaffForm
 import json
@@ -187,6 +187,8 @@ def confirm_products(request):
 
         updated_products.append({
             'product_number': n,
+            'name': product.name,
+            'category': product.category,
             'old_quantity': old_quantity,
             'new_quantity': product.quantity,
             'quantity_taken': requested
@@ -323,6 +325,164 @@ def manage_warehouse(request):
         warehouse = Warehouse.objects.create(name='المستودع الرئيسي', rows_count=6, columns_count=15)
     
     return render(request, 'inventory_app/manage_warehouse.html', {'warehouse': warehouse})
+
+
+@require_http_methods(["POST"])
+@login_required
+def compact_row(request):
+    """ضغط الصف (إزالة الفراغات)"""
+    try:
+        data = json.loads(request.body)
+        row_num = int(data.get('row'))
+        
+        warehouse = Warehouse.objects.first()
+        if not warehouse:
+            return JsonResponse({'success': False, 'error': 'المستودع غير موجود'})
+            
+        with transaction.atomic():
+            # الحصول على جميع مواقع الصف مرتبة حسب العمود
+            locations = list(Location.objects.filter(
+                warehouse=warehouse, 
+                row=row_num
+            ).order_by('column').prefetch_related('products'))
+            
+            # حفظ الحالة السابقة للتراجع
+            undo_data = []
+            for loc in locations:
+                for product in loc.products.all():
+                    undo_data.append({
+                        'product_id': product.id,
+                        'location_id': loc.id
+                    })
+            
+            # حفظ في الجلسة
+            request.session['last_compaction_undo'] = {
+                'type': 'row',
+                'id': row_num,
+                'data': undo_data,
+                'timestamp': timezone.now().isoformat()
+            }
+            
+            # تجميع المنتجات من المواقع المشغولة
+            occupied_groups = []
+            for loc in locations:
+                products = list(loc.products.all())
+                if products:
+                    occupied_groups.append(products)
+            
+            # إعادة توزيع المنتجات على المواقع الأولى
+            for i, group in enumerate(occupied_groups):
+                target_location = locations[i]
+                
+                for product in group:
+                    if product.location_id != target_location.id:
+                        product.location = target_location
+                        product.save(update_fields=['location'])
+                        
+        return JsonResponse({'success': True, 'message': f'تم إعادة ترتيب الصف {row_num} بنجاح', 'can_undo': True})
+        
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'بيانات غير صالحة'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'حدث خطأ: {str(e)}'})
+
+
+@require_http_methods(["POST"])
+@login_required
+def compact_column(request):
+    """ضغط العمود (إزالة الفراغات)"""
+    try:
+        data = json.loads(request.body)
+        col_num = int(data.get('column'))
+        
+        warehouse = Warehouse.objects.first()
+        if not warehouse:
+            return JsonResponse({'success': False, 'error': 'المستودع غير موجود'})
+            
+        with transaction.atomic():
+            # الحصول على جميع مواقع العمود مرتبة حسب الصف
+            locations = list(Location.objects.filter(
+                warehouse=warehouse, 
+                column=col_num
+            ).order_by('row').prefetch_related('products'))
+            
+            # حفظ الحالة السابقة للتراجع
+            undo_data = []
+            for loc in locations:
+                for product in loc.products.all():
+                    undo_data.append({
+                        'product_id': product.id,
+                        'location_id': loc.id
+                    })
+            
+            # حفظ في الجلسة
+            request.session['last_compaction_undo'] = {
+                'type': 'column',
+                'id': col_num,
+                'data': undo_data,
+                'timestamp': timezone.now().isoformat()
+            }
+            
+            # تجميع المنتجات من المواقع المشغولة
+            occupied_groups = []
+            for loc in locations:
+                products = list(loc.products.all())
+                if products:
+                    occupied_groups.append(products)
+            
+            # إعادة توزيع المنتجات على المواقع الأولى (من الأعلى للأسفل)
+            for i, group in enumerate(occupied_groups):
+                target_location = locations[i]
+                
+                for product in group:
+                    if product.location_id != target_location.id:
+                        product.location = target_location
+                        product.save(update_fields=['location'])
+                        
+        return JsonResponse({'success': True, 'message': f'تم إعادة ترتيب العمود {col_num} بنجاح', 'can_undo': True})
+        
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'بيانات غير صالحة'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'حدث خطأ: {str(e)}'})
+
+
+@require_http_methods(["POST"])
+@login_required
+def revert_compaction(request):
+    """التراجع عن آخر عملية ترتيب"""
+    try:
+        undo_info = request.session.get('last_compaction_undo')
+        if not undo_info:
+            return JsonResponse({'success': False, 'error': 'لا توجد عملية للتراجع عنها'})
+            
+        undo_data = undo_info.get('data', [])
+        if not undo_data:
+            return JsonResponse({'success': False, 'error': 'بيانات التراجع فارغة'})
+            
+        with transaction.atomic():
+            # أولاً: نحصل على جميع معرفات المنتجات المتأثرة
+            product_ids = [item['product_id'] for item in undo_data]
+            
+            # نحصل على المنتجات الحالية
+            products_map = {p.id: p for p in Product.objects.filter(id__in=product_ids)}
+            
+            # إعادة المنتجات لمواقعها الأصلية
+            for item in undo_data:
+                product = products_map.get(item['product_id'])
+                if product:
+                    product.location_id = item['location_id']
+                    product.save(update_fields=['location'])
+            
+            # مسح بيانات التراجع
+            del request.session['last_compaction_undo']
+            request.session.modified = True
+            
+        type_str = "الصف" if undo_info['type'] == 'row' else "العمود"
+        return JsonResponse({'success': True, 'message': f'تم التراجع عن ترتيب {type_str} {undo_info["id"]} بنجاح'})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'حدث خطأ أثناء التراجع: {str(e)}'})
 
 
 @require_http_methods(["GET"])
@@ -531,6 +691,9 @@ def warehouse_dashboard(request):
         total=db_models.Sum('quantity')
     )['total'] or 0
     
+    # التقارير الذكية الأخيرة
+    latest_ai_reports = AIInsightLog.objects.all()[:5]
+    
     return render(request, 'inventory_app/dashboard.html', {
         'warehouse': warehouse,
         'products_count': products_count,
@@ -544,6 +707,7 @@ def warehouse_dashboard(request):
         'pending_returns': pending_returns,
         'out_of_stock_products': out_of_stock_products,
         'total_quantity': total_quantity,
+        'latest_ai_reports': latest_ai_reports,
     })
 
 
@@ -578,22 +742,14 @@ def products_list(request):
     # احسب العدد بعد الفلترة (إذا كان هناك بحث أو حاوية)
     filtered_count = products.count() if (search or container_id) else total_count
     
-    # التحقق من طلب عرض الكل
-    show_all = request.GET.get('show_all', 'false') == 'true'
-    
-    if show_all:
-        # عرض جميع المنتجات بدون pagination
-        page_obj = products
-        page_obj.has_other_pages = False
-        page_obj.number = 1
-        page_obj.paginator = type('obj', (object,), {'num_pages': 1})()
-        page_obj.start_index = lambda: 1
-        page_obj.end_index = lambda: products.count()
-    else:
-        # إضافة Pagination - 100 منتج لكل صفحة
-        paginator = Paginator(products, 100)
-        page_number = request.GET.get('page', 1)
-        page_obj = paginator.get_page(page_number)
+    # عرض جميع المنتجات بدون ترقيم صفحات بشكل افتراضي
+    show_all = True
+    page_obj = products
+    page_obj.has_other_pages = False
+    page_obj.number = 1
+    page_obj.paginator = type('obj', (object,), {'num_pages': 1})()
+    page_obj.start_index = lambda: 1
+    page_obj.end_index = lambda: products.count()
     
     # جلب جميع الحاويات للقائمة المنسدلة
     containers = Container.objects.all().order_by('name')
@@ -627,12 +783,19 @@ def product_add(request):
     if request.method == 'POST':
         try:
             # إنشاء المنتج
+            price_val = request.POST.get('price', '')
+            if price_val:
+                price_val = float(price_val)
+            else:
+                price_val = None
+
             product = Product.objects.create(
                 product_number=request.POST.get('product_number'),
                 name=request.POST.get('name', ''),
-                category=request.POST.get('category', ''),
+                # category=request.POST.get('category', ''), # Removed
                 description=request.POST.get('description', ''),
-                quantity=int(request.POST.get('quantity', 0) or 0)
+                quantity=int(request.POST.get('quantity', 0) or 0),
+                price=price_val
             )
             
             # رفع الصورة إذا تم اختيارها
@@ -669,20 +832,28 @@ def product_edit(request, product_id):
             # حفظ القيم القديمة
             old_product_number = product.product_number
             old_name = product.name
-            old_category = product.category
+            # old_category = product.category  # Removed
             old_quantity = product.quantity
+            old_price = product.price
             
             # التعديل
             new_product_number = request.POST.get('product_number')
             new_name = request.POST.get('name', '')
-            new_category = request.POST.get('category', '')
+            # new_category = request.POST.get('category', '')  # Removed
             new_quantity = int(request.POST.get('quantity', 0) or 0)
+            
+            price_val = request.POST.get('price', '')
+            if price_val:
+                new_price = float(price_val)
+            else:
+                new_price = None
             
             product.product_number = new_product_number
             product.name = new_name
-            product.category = new_category
+            # product.category = new_category  # Removed
             product.description = request.POST.get('description', '')
             product.quantity = new_quantity
+            product.price = new_price
             
             # حذف الصورة إذا تم تحديد الخيار
             if request.POST.get('delete_image') == '1' and product.image:
@@ -704,10 +875,12 @@ def product_edit(request, product_id):
                 changes.append(f'رقم المنتج: {old_product_number} → {new_product_number}')
             if old_name != new_name:
                 changes.append(f'الاسم: {old_name} → {new_name}')
-            if old_category != new_category:
-                changes.append(f'الفئة: {old_category} → {new_category}')
+            # if old_category != new_category:
+            #     changes.append(f'الفئة: {old_category} → {new_category}')
             if old_quantity != new_quantity:
                 changes.append(f'الكمية: {old_quantity} → {new_quantity}')
+            if old_price != new_price:
+                changes.append(f'السعر: {old_price} → {new_price}')
             
             if changes:
                 AuditLog.objects.create(
@@ -749,10 +922,6 @@ def product_delete(request, product_id):
                 'container': product.container.name if product.container else None,
                 'location': product.location.full_location if product.location else None,
                 'quantity': product.quantity,
-                'qty_per_carton': product.qty_per_carton,
-                'carton_count': product.carton_count,
-                'dozens_per_carton': product.dozens_per_carton,
-                'pcs_per_dozen': product.pcs_per_dozen,
                 'min_stock_threshold': product.min_stock_threshold,
                 'store_quantity': product.store_quantity,
                 'warehouse_quantity': product.warehouse_quantity,
@@ -789,6 +958,69 @@ def product_delete(request, product_id):
     return render(request, 'inventory_app/product_delete.html', {'product': product})
 
 
+@login_required
+def restore_product(request, log_id):
+    """استعادة منتج محذوف من السجلات"""
+    if not request.user.user_profile.is_admin():
+        messages.error(request, 'غير مصرح لك بالقيام بهذا الإجراء')
+        return redirect('inventory_app:audit_logs')
+        
+    log_entry = get_object_or_404(AuditLog, id=log_id, action='deleted')
+    snapshot = log_entry.product_snapshot
+    
+    if not snapshot:
+        messages.error(request, 'لا توجد نسخة احتياطية للمنتج')
+        return redirect('inventory_app:audit_logs')
+        
+    # التحقق من وجود منتج بنفس الرقم
+    if Product.objects.filter(product_number=snapshot.get('product_number')).exists():
+        messages.error(request, f'منتج بنفس الرقم {snapshot.get("product_number")} موجود بالفعل')
+        return redirect('inventory_app:audit_logs')
+
+    try:
+        # استعادة الحاوية
+        container = None
+        if snapshot.get('container'):
+            container = Container.objects.filter(name=snapshot.get('container')).first()
+            
+        # إنشاء المنتج
+        product = Product.objects.create(
+            product_number=snapshot.get('product_number'),
+            name=snapshot.get('name'),
+            category=snapshot.get('category'),
+            description=snapshot.get('description'),
+            quantity=snapshot.get('quantity', 0),
+            container=container,
+            # الموقع لا يمكن استعادته بدقة لأنه قد يكون مشغولاً، لذا نتركه فارغاً
+            location=None,
+            min_stock_threshold=snapshot.get('min_stock_threshold', 0),
+            price=snapshot.get('price'),
+            store_quantity=snapshot.get('store_quantity', 0),
+            warehouse_quantity=snapshot.get('warehouse_quantity', 0),
+            barcode=snapshot.get('barcode'),
+            image_url=snapshot.get('image_url'),
+            colors=snapshot.get('colors', list())
+        )
+        
+        # تسجيل عملية الاستعادة
+        AuditLog.objects.create(
+            action='added',
+            product=product,
+            product_number=product.product_number,
+            quantity_before=0,
+            quantity_after=product.quantity,
+            quantity_change=product.quantity,
+            notes=f'تم استعادة المنتج: {product.name} من السجل',
+            user=request.user.username
+        )
+        
+        messages.success(request, f'تم استعادة المنتج {product.name} بنجاح')
+    except Exception as e:
+        messages.error(request, f'حدث خطأ أثناء الاستعادة: {str(e)}')
+        
+    return redirect('inventory_app:audit_logs')
+
+
 @csrf_exempt
 def delete_products_bulk(request):
     """حذف منتجات متعددة دفعة واحدة"""
@@ -823,16 +1055,13 @@ def delete_products_bulk(request):
                         'container': product.container.name if product.container else None,
                         'location': product.location.full_location if product.location else None,
                         'quantity': product.quantity,
-                        'qty_per_carton': product.qty_per_carton,
-                        'carton_count': product.carton_count,
-                        'dozens_per_carton': product.dozens_per_carton,
-                        'pcs_per_dozen': product.pcs_per_dozen,
                         'min_stock_threshold': product.min_stock_threshold,
                         'store_quantity': product.store_quantity,
                         'warehouse_quantity': product.warehouse_quantity,
                         'barcode': product.barcode,
                         'image_url': product.image_url,
                         'price': str(product.price) if product.price is not None else None,
+                        'colors': product.colors,
                     }
                     AuditLog.objects.create(
                         action='deleted',
@@ -1285,22 +1514,14 @@ def get_stats(request):
             occupied_locations = 0
             empty_locations = 0
         
-        low_stock_count = Product.objects.filter(quantity__lte=24, quantity__gt=0).count()
+        low_stock_count = Product.objects.filter(quantity__lt=24, quantity__gt=0).count()
         out_of_stock_count = Product.objects.filter(quantity=0).count()
 
-        reorder_count = Product.objects.filter(min_stock_threshold__gt=0, quantity__lt=db_models.F('min_stock_threshold')).count()
-        overstock_count = Product.objects.filter(min_stock_threshold__gt=0, quantity__gt=db_models.F('min_stock_threshold') * 2).count()
-        watchlist_count = Product.objects.filter(min_stock_threshold__gt=0, quantity__gte=db_models.F('min_stock_threshold') * 0.9, quantity__lte=db_models.F('min_stock_threshold') * 1.1).count()
-        now_dt = timezone.now()
-        seven_days_ago = now_dt - timedelta(days=7)
-        one_day_ago = now_dt - timedelta(days=1)
-        logs_recent = AuditLog.objects.filter(created_at__gte=seven_days_ago, action__in=['quantity_added', 'quantity_taken'])
-        large_change_threshold = 50
-        large_changes_count = logs_recent.filter(quantity_change__gte=large_change_threshold).count() + logs_recent.filter(quantity_change__lte=-large_change_threshold).count()
-        logs_day = AuditLog.objects.filter(created_at__gte=one_day_ago, action__in=['quantity_added', 'quantity_taken']).values('product_number').annotate(c=db_models.Count('id'))
-        frequent_changes_count = sum(1 for row in logs_day if row['c'] > 5)
-        negative_quantities_count = Product.objects.filter(quantity__lt=0).count()
-        anomaly_count = large_changes_count + frequent_changes_count + negative_quantities_count
+        # تم إزالة الحسابات الأخرى بناءً على طلب المستخدم (فقط المخزون المنخفض)
+        reorder_count = 0
+        overstock_count = 0
+        watchlist_count = 0
+        anomaly_count = 0
 
         return JsonResponse({
             # المنتجات
@@ -1309,10 +1530,10 @@ def get_stats(request):
             'products_without_locations': products_without_locations,
             'low_stock_count': low_stock_count,
             'out_of_stock_count': out_of_stock_count,
-            'reorder_count': reorder_count,
-            'overstock_count': overstock_count,
-            'watchlist_count': watchlist_count,
-            'anomaly_count': anomaly_count,
+            'reorder_count': 0,
+            'overstock_count': 0,
+            'watchlist_count': 0,
+            'anomaly_count': 0,
             # الأماكن
             'locations_count': locations_count,
             'total_capacity': total_capacity,
@@ -1525,116 +1746,37 @@ def data_quality_report(request):
     missing_location_products = Product.objects.filter(location__isnull=True)
 
     invalid_carton_data = []
-    for p in products:
-        if p.carton_count is not None and p.dozens_per_carton and p.pcs_per_dozen:
-            expected = p.carton_count * p.dozens_per_carton * p.pcs_per_dozen
-            if expected != p.quantity:
-                invalid_carton_data.append({'product': p, 'expected': expected, 'actual': p.quantity})
-
+    # منطق الكراتين تم إيقافه
+    
     return render(request, 'inventory_app/data_quality.html', {
         'duplicates_by_name': duplicates_by_name,
         'duplicates_by_barcode': duplicates_by_barcode,
         'near_duplicates_by_number': near_duplicates_by_number,
         'missing_location_products': missing_location_products,
-        'invalid_carton_data': invalid_carton_data,
+        'invalid_carton_data': [],
         'counts': {
             'name': len(duplicates_by_name),
             'barcode': len(duplicates_by_barcode),
             'number': len(near_duplicates_by_number),
             'missing_location': missing_location_products.count(),
-            'invalid_carton': len(invalid_carton_data),
+            'invalid_carton': 0,
         }
     })
 
 def inventory_insights(request):
-    multiplier = 2
-    try:
-        multiplier = int(request.GET.get('overstock_multiplier', 2))
-        if multiplier < 1:
-            multiplier = 2
-    except (ValueError, TypeError):
-        multiplier = 2
-
-    products = Product.objects.select_related('location').all()
-
+    # تم إزالة منطق الحسابات الأخرى بناءً على طلب المستخدم
     low_stock_limit = 24
-    watchlist_margin = 0.10
-    watchlist_margin_percent = 10
-    frequent_change_min_count = 5
-    frequent_window_hours = 24
-    reorder_suggestions = []
-    for p in products:
-        threshold = p.min_stock_threshold or 0
-        wh = p.quantity or 0
-        if threshold > 0 and wh < threshold:
-            reorder_qty = threshold - wh
-            reorder_suggestions.append({'product': p, 'reorder_qty': reorder_qty, 'shortage': reorder_qty})
 
-    overstock_items = []
-    for p in products:
-        threshold = p.min_stock_threshold or 0
-        wh = p.quantity or 0
-        if threshold > 0 and wh > threshold * multiplier:
-            excess = wh - (threshold * multiplier)
-            overstock_items.append({'product': p, 'excess': excess, 'threshold': threshold, 'warehouse': wh})
-
-    watchlist = []
-    for p in products:
-        threshold = p.min_stock_threshold or 0
-        wh = p.quantity or 0
-        if threshold > 0:
-            lower = int(threshold * (1 - watchlist_margin))
-            upper = int(threshold * (1 + watchlist_margin))
-            if wh >= lower and wh <= upper:
-                watchlist.append({'product': p, 'threshold': threshold, 'warehouse': wh})
-
-    general_low_stock = Product.objects.filter(quantity__lte=low_stock_limit, quantity__gt=0).order_by('quantity')
-
-    now_dt = timezone.now()
-    seven_days_ago = now_dt - timedelta(days=7)
-    one_day_ago = now_dt - timedelta(days=1)
-    logs_recent = AuditLog.objects.filter(created_at__gte=seven_days_ago, action__in=['quantity_added', 'quantity_taken']).order_by('-created_at')
-    large_change_threshold = 50
-    large_changes = [
-        {'log': log, 'product_number': log.product_number, 'change': abs(log.quantity_change), 'before': log.quantity_before, 'after': log.quantity_after}
-        for log in logs_recent if abs(log.quantity_change or 0) >= large_change_threshold
-    ]
-    logs_day = AuditLog.objects.filter(created_at__gte=one_day_ago, action__in=['quantity_added', 'quantity_taken'])
-    freq_map = {}
-    for l in logs_day:
-        key = l.product_number
-        freq_map[key] = freq_map.get(key, 0) + 1
-    frequent_changes = []
-    for pn, cnt in freq_map.items():
-        if cnt > frequent_change_min_count:
-            p = Product.objects.filter(product_number=pn).first()
-            if p:
-                frequent_changes.append({'product': p, 'count': cnt})
-    negative_quantities = Product.objects.filter(quantity__lt=0)
+    # المنتجات المنخفضة (أقل من 24)
+    general_low_stock = Product.objects.filter(quantity__lt=low_stock_limit, quantity__gt=0).order_by('quantity')
 
     return render(request, 'inventory_app/inventory_insights.html', {
-        'multiplier': multiplier,
-        'reorder_suggestions': reorder_suggestions,
-        'overstock_items': overstock_items,
-        'watchlist': watchlist,
         'general_low_stock': general_low_stock,
-        'large_changes': large_changes,
-        'frequent_changes': frequent_changes,
-        'negative_quantities': negative_quantities,
         'policy': {
             'low_stock_limit': low_stock_limit,
-            'overstock_multiplier': multiplier,
-            'watchlist_margin_percent': watchlist_margin_percent,
-            'large_change_threshold': large_change_threshold,
-            'frequent_change_min_count': frequent_change_min_count,
-            'frequent_window_hours': frequent_window_hours,
         },
         'counts': {
-            'reorder': len(reorder_suggestions),
-            'overstock': len(overstock_items),
-            'watchlist': len(watchlist),
             'low_general': general_low_stock.count(),
-            'anomaly': len(large_changes) + len(frequent_changes) + negative_quantities.count(),
         }
     })
 
@@ -1646,7 +1788,7 @@ def low_stock_products_api(request):
         limit = 10
     if limit < 1:
         limit = 10
-    qs = Product.objects.filter(quantity__lte=24, quantity__gt=0).order_by('quantity')[:limit]
+    qs = Product.objects.filter(quantity__lt=24, quantity__gt=0).order_by('quantity')[:limit]
     data = []
     for p in qs:
         data.append({
@@ -1822,6 +1964,100 @@ def export_products_pdf(request):
         error_msg = f'خطأ في إنشاء PDF: {str(e)}\n{traceback.format_exc()}'
         return HttpResponse(error_msg, content_type='text/plain')
 
+def export_order_pdf(request, order_id):
+    from django.http import HttpResponse
+    from playwright.sync_api import sync_playwright
+    from datetime import datetime
+    try:
+        order = get_object_or_404(Order, id=order_id)
+        now = datetime.now()
+        rows_html = ''
+        for idx, item in enumerate(order.products_data, start=1):
+            num = item.get('product_number')
+            taken = item.get('quantity_taken')
+            old_q = item.get('old_quantity')
+            new_q = item.get('new_quantity')
+            rows_html += f'''
+            <tr>
+                <td>{idx}</td>
+                <td><strong>{num}</strong></td>
+                <td>{taken}</td>
+                <td>{old_q}</td>
+                <td>{new_q}</td>
+            </tr>
+            '''
+
+        html_content = f'''
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', 'Arial', 'Tahoma', sans-serif; font-size: 10pt; direction: rtl; padding: 20px; }}
+        .header {{ text-align: center; color: #667eea; font-size: 24pt; font-weight: bold; margin-bottom: 10px; }}
+        .info {{ text-align: center; margin-bottom: 20px; font-size: 11pt; color: #374151; }}
+        .summary {{ margin-top: 10px; text-align: center; color: #374151; font-size: 10pt; }}
+        .section-title {{ font-size: 14pt; font-weight: bold; color: #1e293b; margin: 15px 0; }}
+        table {{ width: 100%; border-collapse: collapse; margin: 0 auto; }}
+        th {{ background: #eef2ff; color: #1e293b; font-weight: bold; padding: 8px; border-bottom: 2px solid #e2e8f0; }}
+        td {{ padding: 8px; border-bottom: 1px solid #e2e8f0; }}
+        .meta {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0 20px; }}
+        .meta-item {{ background: #f8fafc; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; }}
+        .label {{ color: #64748b; font-weight: 600; }}
+        .value {{ color: #1e293b; font-weight: bold; }}
+    </style>
+    <title>طلبية {order.order_number}</title>
+    </head>
+<body>
+    <div class="header">تفاصيل الطلبية</div>
+    <div class="info">رقم الطلبية: <span style="font-family: monospace;">{order.order_number}</span></div>
+    <div class="summary">تاريخ التقرير: {now.strftime('%Y-%m-%d %H:%M')}</div>
+    <div class="meta">
+        <div class="meta-item"><div class="label">اسم المستلم</div><div class="value">{order.recipient_name or '-'}
+        </div></div>
+        <div class="meta-item"><div class="label">عدد المنتجات</div><div class="value">{order.total_products}</div></div>
+        <div class="meta-item"><div class="label">إجمالي الكميات المسحوبة</div><div class="value">{order.total_quantities}</div></div>
+        <div class="meta-item"><div class="label">تاريخ السحب</div><div class="value">{order.created_at.strftime('%Y-%m-%d %H:%M')}</div></div>
+    </div>
+    {f'<div style="margin: 10px 0; color: #374151;"><span class="label">ملاحظات:</span> <span class="value">{order.notes}</span></div>' if getattr(order, 'notes', None) else ''}
+    <div class="section-title">تفاصيل المنتجات</div>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>رقم المنتج</th>
+                <th>الكمية المسحوبة</th>
+                <th>الكمية قبل</th>
+                <th>الكمية بعد</th>
+            </tr>
+        </thead>
+        <tbody>
+            {rows_html}
+        </tbody>
+    </table>
+</body>
+</html>
+'''
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.set_content(html_content)
+            pdf_bytes = page.pdf(
+                format='A4',
+                landscape=False,
+                margin={'top': '1cm', 'right': '1cm', 'bottom': '1cm', 'left': '1cm'}
+            )
+            browser.close()
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        filename = f"order_{order.order_number}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+    except Exception as e:
+        import traceback
+        error_msg = f'خطأ في إنشاء PDF: {str(e)}\n{traceback.format_exc()}'
+        return HttpResponse(error_msg, content_type='text/plain')
+
 
 def export_products_excel(request):
     """تصدير قائمة المنتجات إلى Excel"""
@@ -1884,7 +2120,7 @@ def export_products_excel(request):
             cell.font = Font(name='Arial', size=11)
     
     # ضبط عرض الأعمدة
-    column_widths = [5, 15, 25, 15, 10, 12, 15]
+    column_widths = [5, 15, 25, 15, 15, 10, 12, 15]
     for col, width in enumerate(column_widths, start=1):
         ws.column_dimensions[get_column_letter(col)].width = width
     
@@ -2037,6 +2273,166 @@ def update_location_notes(request):
 @require_http_methods(["POST"])
 @exclude_maintenance
 @login_required
+def inspect_backup(request):
+    """تحليل ملف النسخ الاحتياطي وإرجاع تقرير تفصيلي قبل الاستيراد"""
+    try:
+        uploaded_file = request.FILES.get('backup_file')
+        inline_json = request.POST.get('backup_json')
+        if not uploaded_file and not inline_json:
+            return JsonResponse({'success': False, 'error': 'لم يتم إرسال ملف أو محتوى JSON'})
+
+        filename = getattr(uploaded_file, 'name', '') if uploaded_file else 'inline.json'
+        size = getattr(uploaded_file, 'size', None)
+        raw_bytes = uploaded_file.read() if uploaded_file else inline_json.encode('utf-8', errors='ignore')
+        data, parse_meta = _load_backup_data(raw_bytes, filename)
+        if data is None:
+            msg = 'الملف غير صالح (JSON)'
+            if isinstance(parse_meta, dict) and parse_meta.get('message'):
+                msg = msg + ' - ' + parse_meta.get('message')
+            return JsonResponse({'success': False, 'error': msg})
+        if isinstance(data, list):
+            grouped = {}
+            for item in data:
+                if isinstance(item, dict):
+                    model = item.get('model') or ''
+                    name = model.split('.')[-1] if model else ''
+                    if not name:
+                        continue
+                    section = name + 's'
+                    if name == 'userprofile':
+                        section = 'user_profiles'
+                    elif name == 'useractivitylog':
+                        section = 'user_activity_logs'
+                    elif name == 'auditlog':
+                        section = 'audit_logs'
+                    grouped.setdefault(section, []).append(item)
+            data = {'export_info': {'description': 'array_payload_transformed'}, **grouped}
+
+        export_info = data.get('export_info', {})
+        known_sections = [
+            'warehouses', 'locations', 'products',
+            'orders', 'returns', 'audit_logs',
+            'user_profiles', 'user_activity_logs'
+        ]
+        sections = []
+        schema_errors = []
+
+        def analyze_section(name, items):
+            info = {
+                'name': name,
+                'count': 0,
+                'models': {},
+                'schema_ok': True,
+                'errors': [],
+                'sample': []
+            }
+            if not isinstance(items, list):
+                info['schema_ok'] = False
+                info['errors'].append('القسم ليس مصفوفة')
+                return info
+            info['count'] = len(items)
+            for idx, item in enumerate(items):
+                if idx < 3:
+                    try:
+                        info['sample'].append(item)
+                    except Exception:
+                        pass
+                if not isinstance(item, dict):
+                    info['schema_ok'] = False
+                    info['errors'].append(f'{name}[{idx}]: العنصر ليس كائناً JSON')
+                    continue
+                for req in ['model', 'pk', 'fields']:
+                    if req not in item:
+                        info['schema_ok'] = False
+                        info['errors'].append(f"{name}[{idx}]: المكوّن '{req}' مفقود")
+                        break
+                model = item.get('model')
+                if isinstance(model, str):
+                    info['models'][model] = info['models'].get(model, 0) + 1
+            return info
+
+        for key, value in data.items():
+            if isinstance(value, list):
+                sec = analyze_section(key, value)
+                sections.append(sec)
+                if sec['errors']:
+                    schema_errors.extend(sec['errors'])
+
+        # تحليل التكرار في المنتجات الموجودة مسبقاً
+        product_duplicates = []
+        if 'products' in data and isinstance(data['products'], list):
+            try:
+                from collections import Counter
+                backup_numbers = []
+                for item in data['products']:
+                    if isinstance(item, dict) and isinstance(item.get('fields'), dict):
+                        pn = item['fields'].get('product_number')
+                        if pn:
+                            backup_numbers.append(pn)
+                counts = Counter(backup_numbers)
+                numbers = list(counts.keys())
+                existing = Product.objects.filter(product_number__in=numbers).values('product_number', 'name')
+                exist_map = {e['product_number']: e['name'] for e in existing}
+                for pn, cnt in counts.items():
+                    if pn in exist_map or cnt > 1:
+                        product_duplicates.append({
+                            'product_number': pn,
+                            'count_in_backup': cnt,
+                            'existing': pn in exist_map,
+                            'existing_name': exist_map.get(pn)
+                        })
+            except Exception:
+                pass
+
+        # اقتراح التبعيات
+        present = set([s['name'] for s in sections if s['count'] > 0])
+        suggested_dependencies = {}
+        if 'products' in present:
+            suggested_dependencies['products'] = ['locations', 'warehouses']
+        if 'locations' in present:
+            suggested_dependencies['locations'] = ['warehouses']
+        if 'audit_logs' in present:
+            suggested_dependencies['audit_logs'] = ['products', 'locations', 'warehouses']
+
+        return JsonResponse({
+            'success': True,
+            'filename': filename,
+            'size': size,
+            'export_info': export_info,
+            'sections': sections,
+            'suggested_dependencies': suggested_dependencies,
+            'has_errors': len(schema_errors) > 0,
+            'schema_errors': schema_errors[:100],
+            'product_duplicates': product_duplicates,
+            'parse_meta': parse_meta
+        }, json_dumps_params={'ensure_ascii': False})
+
+    except json.JSONDecodeError as e:
+        return JsonResponse({'success': False, 'error': f'الملف غير صالح (JSON): {str(e)}'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@transaction.atomic
+@exclude_maintenance
+@login_required
+def reset_environment(request):
+    """حذف كل البيانات لتجهيز بيئة نظيفة (يستثني المشرفين)"""
+    try:
+        # حذف بالترتيب للتأكد من العلاقات
+        UserActivityLog.objects.all().delete()
+        AuditLog.objects.all().delete()
+        ProductReturn.objects.all().delete()
+        Order.objects.all().delete()
+        Product.objects.all().delete()
+        Location.objects.all().delete()
+        Warehouse.objects.all().delete()
+        UserProfile.objects.exclude(user__is_superuser=True).delete()
+
+        return JsonResponse({'success': True, 'message': 'تم تهيئة بيئة نظيفة بنجاح'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 def export_backup(request):
     """تصدير النسخ الاحتياطي الشامل - يشمل جميع البيانات والأنشطة"""
     try:
@@ -2103,133 +2499,254 @@ def export_backup(request):
 def import_backup(request):
     """استيراد النسخ الاحتياطي"""
     try:
-        if 'backup_file' not in request.FILES:
-            return JsonResponse({
-                'success': False,
-                'error': 'لم يتم إرسال ملف'
-            })
+        uploaded_file = request.FILES.get('backup_file')
+        inline_json = request.POST.get('backup_json')
+        if not uploaded_file and not inline_json:
+            return JsonResponse({'success': False, 'error': 'لم يتم إرسال ملف أو محتوى JSON'})
         
-        uploaded_file = request.FILES['backup_file']
+        filename = getattr(uploaded_file, 'name', '') if uploaded_file else 'inline.json'
+        raw_bytes = uploaded_file.read() if uploaded_file else inline_json.encode('utf-8', errors='ignore')
+        data, parse_meta = _load_backup_data(raw_bytes, filename)
+        if data is None:
+            msg = 'الملف غير صالح (JSON)'
+            if isinstance(parse_meta, dict) and parse_meta.get('message'):
+                msg = msg + ' - ' + parse_meta.get('message')
+            return JsonResponse({'success': False, 'error': msg})
+        if isinstance(data, list):
+            grouped = {}
+            for item in data:
+                if isinstance(item, dict):
+                    model = item.get('model') or ''
+                    name = model.split('.')[-1] if model else ''
+                    if not name:
+                        continue
+                    section = name + 's'
+                    if name == 'userprofile':
+                        section = 'user_profiles'
+                    elif name == 'useractivitylog':
+                        section = 'user_activity_logs'
+                    elif name == 'auditlog':
+                        section = 'audit_logs'
+                    grouped.setdefault(section, []).append(item)
+            data = {'export_info': {'description': 'array_payload_transformed'}, **grouped}
         
-        # قراءة الملف
-        data = json.loads(uploaded_file.read().decode('utf-8'))
-        
-        # التحقق من صحة الملف
-        if 'export_info' not in data:
-            return JsonResponse({
-                'success': False,
-                'error': 'الملف غير صالح'
-            })
+        # تهيئة export_info إن كان مفقوداً
+        if 'export_info' not in data or not isinstance(data.get('export_info'), dict):
+            data['export_info'] = {
+                'date': datetime.now().isoformat(),
+                'version': 'unknown',
+                'description': 'استيراد بدون معلومات التصدير'
+            }
         
         clear_existing = request.POST.get('clear_existing', 'false') == 'true'
+        avoid_duplicates = request.POST.get('avoid_duplicates', 'false') == 'true'
+        # الأقسام المحددة (اختياري)
+        selected_sections_raw = request.POST.get('selected_sections', '')
+        try:
+            selected_sections = set(json.loads(selected_sections_raw)) if selected_sections_raw else set()
+        except Exception:
+            selected_sections = set()
+        # إذا لم تُحدّد أقسام، نستخدم الافتراضي: كل ما هو موجود في الملف
+        if not selected_sections:
+            selected_sections = set([k for k, v in data.items() if isinstance(v, list)])
+        
+        # تحقق بنية الأقسام قبل الاستيراد وإعداد إحصائيات
+        schema_errors = []
+        for section in selected_sections:
+            if section in data:
+                if not isinstance(data[section], list):
+                    schema_errors.append(f"القسم '{section}' يجب أن يكون مصفوفة")
+                    continue
+                for idx, item in enumerate(data[section]):
+                    if not isinstance(item, dict):
+                        schema_errors.append(f"{section}[{idx}]: العنصر ليس كائناً JSON")
+                        break
+                    for k in ['model', 'pk', 'fields']:
+                        if k not in item:
+                            schema_errors.append(f"{section}[{idx}]: المكوّن '{k}' مفقود")
+                            break
+        if schema_errors:
+            return JsonResponse({'success': False, 'error': 'أخطاء في بنية الملف', 'details': schema_errors})
+        
+        # إضافة التبعيات اللازمة تلقائياً لتجنب أخطاء المراجع
+        # المنتجات تحتاج الأماكن والمستودعات، والأماكن تحتاج مستودعات، والسجلات تحتاج المنتجات
+        if 'products' in selected_sections:
+            selected_sections.update(['locations', 'warehouses'])
+        if 'locations' in selected_sections:
+            selected_sections.add('warehouses')
+        if 'audit_logs' in selected_sections:
+            selected_sections.update(['products', 'locations', 'warehouses'])
         
         # بدء الاستيراد
+        import_counts = {s: 0 for s in selected_sections}
+        import_errors = []
         with transaction.atomic():
             if clear_existing:
-                # حذف جميع البيانات الموجودة بالترتيب الصحيح (تجنب أخطاء Foreign Key)
-                # ملاحظة: لا نحذف UserProfile للـ admin (superuser) لتجنب المشاكل
-                UserActivityLog.objects.all().delete()
-                AuditLog.objects.all().delete()
-                ProductReturn.objects.all().delete()
-                Order.objects.all().delete()
-                Product.objects.all().delete()
-                Location.objects.all().delete()
-                Warehouse.objects.all().delete()
-                UserProfile.objects.exclude(user__is_superuser=True).delete()  # حذف UserProfiles ما عدا admin
+                # حذف بحسب الأقسام المختارة، مع مراعاة العلاقات
+                if 'user_activity_logs' in selected_sections:
+                    UserActivityLog.objects.all().delete()
+                if 'audit_logs' in selected_sections:
+                    AuditLog.objects.all().delete()
+                if 'returns' in selected_sections:
+                    ProductReturn.objects.all().delete()
+                if 'orders' in selected_sections:
+                    Order.objects.all().delete()
+                if 'products' in selected_sections:
+                    Product.objects.all().delete()
+                if 'locations' in selected_sections:
+                    Location.objects.all().delete()
+                if 'warehouses' in selected_sections:
+                    Warehouse.objects.all().delete()
+                if 'user_profiles' in selected_sections:
+                    # حماية الحساب المسؤول 'ammar' من الحذف أثناء الاستيراد
+                    UserProfile.objects.exclude(user__username='ammar').exclude(user__is_superuser=True).delete()
             
             # استيراد البيانات بالترتيب الصحيح (حسب العلاقات)
             # 1. البيانات الأساسية أولاً
-            if 'warehouses' in data:
+            if 'warehouses' in selected_sections and 'warehouses' in data:
                 objects = serializers.deserialize('json', json.dumps(data['warehouses']))
-                for obj in objects:
-                    obj.save()
+                for i, obj in enumerate(objects):
+                    try:
+                        obj.save()
+                        import_counts['warehouses'] += 1
+                    except Exception as e:
+                        import_errors.append(f"warehouses[{i}]: {str(e)}")
             
-            if 'locations' in data:
+            if 'locations' in selected_sections and 'locations' in data:
                 objects = serializers.deserialize('json', json.dumps(data['locations']))
-                for obj in objects:
-                    obj.save()
+                for i, obj in enumerate(objects):
+                    try:
+                        obj.save()
+                        import_counts['locations'] += 1
+                    except Exception as e:
+                        import_errors.append(f"locations[{i}]: {str(e)}")
             
-            if 'products' in data:
+            if 'products' in selected_sections and 'products' in data:
                 objects = serializers.deserialize('json', json.dumps(data['products']))
-                for obj in objects:
-                    obj.save()
+                for i, obj in enumerate(objects):
+                    try:
+                        instance = obj.object
+                        if avoid_duplicates:
+                            pn = getattr(instance, 'product_number', None)
+                            if pn:
+                                existing = Product.objects.filter(product_number=pn).first()
+                                if existing:
+                                    instance.pk = existing.pk
+                        instance.save()
+                        import_counts['products'] += 1
+                    except Exception as e:
+                        import_errors.append(f"products[{i}]: {str(e)}")
             
-            # 2. ملفات المستخدمين (تخطي admin لتجنب التكرار)
-            if 'user_profiles' in data:
-                # فلترة UserProfiles لتخطي admin قبل deserialize
-                filtered_user_profiles = []
-                for profile_data in data['user_profiles']:
-                    # في JSON المستورد، user يتم تخزينه في fields كـ user أو user_id
-                    user_id = None
-                    if 'fields' in profile_data:
-                        # محاولة الحصول على user_id من fields
-                        if 'user' in profile_data['fields']:
-                            user_id = profile_data['fields']['user']
-                        elif 'user_id' in profile_data['fields']:
-                            user_id = profile_data['fields']['user_id']
-                    
-                    # التحقق من أن user_id موجود وأن المستخدم ليس superuser
-                    if user_id:
-                        try:
-                            user = User.objects.get(pk=user_id)
-                            # تخطي UserProfile للمستخدمين الذين هم superuser (admin)
-                            if user.is_superuser:
-                                logger.info(f'تم تخطي UserProfile للـ admin (user_id={user_id}) من النسخ الاحتياطي')
-                                continue
-                            # التحقق من عدم وجود UserProfile مسبقاً لتجنب التكرار
-                            if UserProfile.objects.filter(user_id=user_id).exists():
-                                logger.info(f'UserProfile موجود مسبقاً للمستخدم user_id={user_id}، تم تخطي الاستيراد')
-                                continue
-                        except User.DoesNotExist:
-                            logger.warning(f'المستخدم مع user_id={user_id} غير موجود، تم تخطي UserProfile')
-                            continue
-                    
-                    # إضافة UserProfile إلى القائمة المفلترة
-                    filtered_user_profiles.append(profile_data)
+            # 2. ملفات المستخدمين (معالجة ذكية للمستخدمين المفقودين)
+            if 'user_profiles' in selected_sections and 'user_profiles' in data:
+                # التأكد من وجود مستخدم النظام الافتراضي
+                system_user, _ = User.objects.get_or_create(username='system', defaults={'email': 'system@local', 'is_active': False})
                 
-                # استيراد UserProfiles المفلترة فقط
-                if filtered_user_profiles:
-                    objects = serializers.deserialize('json', json.dumps(filtered_user_profiles))
-                    for obj in objects:
-                        try:
-                            obj.save()
-                        except Exception as e:
-                            logger.error(f'خطأ في استيراد UserProfile: {str(e)}', exc_info=True)
+                for i, profile_data in enumerate(data['user_profiles']):
+                    try:
+                        # استخراج user_id من البيانات
+                        user_id = None
+                        if 'fields' in profile_data:
+                            user_id = profile_data['fields'].get('user') or profile_data['fields'].get('user_id')
+                        
+                        if not user_id:
                             continue
+
+                        # التحقق من وجود المستخدم
+                        if not User.objects.filter(pk=user_id).exists():
+                            # إذا كان المستخدم غير موجود، نربط الملف بمستخدم النظام أو نتجاوزه
+                            # هنا سنقوم بإنشاء مستخدم وهمي للحفاظ على تكامل البيانات
+                            try:
+                                # محاولة استرداد اسم المستخدم القديم إذا كان متاحاً في مكان ما، أو استخدام ID
+                                dummy_username = f"imported_user_{user_id}"
+                                User.objects.create(pk=user_id, username=dummy_username, is_active=False)
+                            except Exception:
+                                # إذا فشل إنشاء المستخدم بنفس الـ ID (ربما تعارض)، نستخدم مستخدم النظام
+                                profile_data['fields']['user'] = system_user.id
+                        
+                        # الآن نحاول الاستيراد
+                        objects = serializers.deserialize('json', json.dumps([profile_data]))
+                        for obj in objects:
+                            # حماية: لا تقم بتحديث ملف المسؤول ammar إذا كان موجوداً في النسخة الاحتياطية بمعلومات قديمة
+                            if obj.object.user.username == 'ammar':
+                                continue
+                            obj.save()
+                            import_counts['user_profiles'] += 1
+                            
+                    except Exception as e:
+                        import_errors.append(f"user_profiles[{i}]: {str(e)}")
+
             
             # 3. سجلات العمليات
-            if 'audit_logs' in data:
+            if 'audit_logs' in selected_sections and 'audit_logs' in data:
                 objects = serializers.deserialize('json', json.dumps(data['audit_logs']))
-                for obj in objects:
-                    obj.save()
+                for i, obj in enumerate(objects):
+                    try:
+                        obj.save()
+                        import_counts['audit_logs'] += 1
+                    except Exception as e:
+                        import_errors.append(f"audit_logs[{i}]: {str(e)}")
             
-            if 'orders' in data:
+            if 'orders' in selected_sections and 'orders' in data:
                 objects = serializers.deserialize('json', json.dumps(data['orders']))
-                for obj in objects:
-                    obj.save()
+                for i, obj in enumerate(objects):
+                    try:
+                        obj.save()
+                        import_counts['orders'] += 1
+                    except Exception as e:
+                        import_errors.append(f"orders[{i}]: {str(e)}")
             
-            if 'returns' in data:
+            if 'returns' in selected_sections and 'returns' in data:
                 objects = serializers.deserialize('json', json.dumps(data['returns']))
-                for obj in objects:
-                    obj.save()
+                for i, obj in enumerate(objects):
+                    try:
+                        obj.save()
+                        import_counts['returns'] += 1
+                    except Exception as e:
+                        import_errors.append(f"returns[{i}]: {str(e)}")
             
             # 4. التقارير (لا يوجد تقارير يومية بعد الإزالة)
             
             # 5. سجلات أنشطة المستخدمين
-            if 'user_activity_logs' in data:
-                objects = serializers.deserialize('json', json.dumps(data['user_activity_logs']))
-                for obj in objects:
-                    obj.save()
+            if 'user_activity_logs' in selected_sections and 'user_activity_logs' in data:
+                # التأكد من وجود مستخدم النظام لمعالجة السجلات التي ليس لها مستخدم
+                system_user, _ = User.objects.get_or_create(username='system', defaults={'email': 'system@local', 'is_active': False})
+                
+                # معالجة السجلات قبل الاستيراد
+                logs_data = data['user_activity_logs']
+                for log in logs_data:
+                    if 'fields' in log and 'user' in log['fields']:
+                        user_id = log['fields']['user']
+                        # التحقق من وجود المستخدم
+                        if not User.objects.filter(pk=user_id).exists():
+                            # ربط السجل بمستخدم النظام بدلاً من المستخدم المفقود
+                            log['fields']['user'] = system_user.id
+
+                objects = serializers.deserialize('json', json.dumps(logs_data))
+                for i, obj in enumerate(objects):
+                    try:
+                        obj.save()
+                        import_counts['user_activity_logs'] += 1
+                    except Exception as e:
+                        import_errors.append(f"user_activity_logs[{i}]: {str(e)}")
         
+        if import_errors:
+            return JsonResponse({
+                'success': False,
+                'error': 'حدثت أخطاء أثناء الاستيراد',
+                'details': import_errors[:50],
+                'imported': import_counts
+            })
         return JsonResponse({
             'success': True,
-            'message': 'تم الاستيراد بنجاح'
+            'message': 'تم الاستيراد بنجاح',
+            'imported': import_counts
         })
         
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
         return JsonResponse({
             'success': False,
-            'error': 'الملف غير صالح'
+            'error': f'الملف غير صالح (JSON): {str(e)}'
         })
     except Exception as e:
         return JsonResponse({
@@ -2268,6 +2785,14 @@ def delete_data(request):
     """حذف البيانات المحددة"""
     try:
         data = json.loads(request.body)
+        # التحقق من كلمة المرور
+        password = str(data.get('password', '') or '').strip()
+        # ملاحظة أمنية: يفضل وضع كلمة المرور في الإعدادات/المتغيرات البيئية
+        REQUIRED_PASSWORD = 'Thepest**1'
+        if not password:
+            return JsonResponse({'success': False, 'error': 'يجب إدخال كلمة مرور الحذف'}, status=400)
+        if password != REQUIRED_PASSWORD:
+            return JsonResponse({'success': False, 'error': 'كلمة مرور غير صحيحة'}, status=403)
         
         # قراءة البيانات المحددة للحذف
         delete_products = data.get('delete_products', False)
@@ -2322,9 +2847,17 @@ def delete_data(request):
         
         
         if delete_user_profiles:
-            count = UserProfile.objects.count()
-            UserProfile.objects.all().delete()
-            deleted_items.append(f'{count} ملف مستخدم')
+            # حذف جميع ملفات المستخدمين ما عدا المستخدم المسؤول 'ammar'
+            profiles_to_delete = UserProfile.objects.exclude(user__username='ammar')
+            count = profiles_to_delete.count()
+            profiles_to_delete.delete()
+            
+            # حذف المستخدمين المرتبطين (ما عدا ammar)
+            users_to_delete = User.objects.exclude(username='ammar').exclude(is_superuser=True)
+            users_count = users_to_delete.count()
+            users_to_delete.delete()
+            
+            deleted_items.append(f'{count} ملف مستخدم و {users_count} حساب')
         
         if not deleted_items:
             return JsonResponse({
@@ -2349,37 +2882,221 @@ def delete_data(request):
         })
 
 
+@login_required
+def get_all_recipients_stats(request):
+    """API لجلب إحصائيات جميع المستلمين"""
+    from django.db.models import Count, Sum
+    recipients = (
+        Order.objects.exclude(recipient_name__isnull=True)
+        .exclude(recipient_name='')
+        .values('recipient_name')
+        .annotate(count=Count('id'), total_qty=Sum('total_quantities'))
+        .order_by('-count')
+    )
+    return JsonResponse({
+        'success': True,
+        'recipients': list(recipients)
+    })
+
+
+@login_required
 def orders_list(request):
-    """عرض قائمة الطلبات المسحوبة"""
+    """عرض قائمة الطلبات المسحوبة مع إحصائيات متقدمة"""
     from django.core.paginator import Paginator
+    from django.db.models.functions import TruncDate
+    from django.db.models import Count, Sum
+    import json
     
     # الاستعلام الأساسي
     orders_qs = Order.objects.all().order_by('-created_at')
     
-    # إحصائيات
+    # تصفية حسب المستلم إذا تم تحديده
+    recipient_filter = request.GET.get('recipient')
+    product_query = request.GET.get('product_query', '').strip().lower()
+    recipient_items = []
+    
+    if recipient_filter:
+        orders_qs = orders_qs.filter(recipient_name=recipient_filter)
+        
+        # تجميع سجل المواد للمستلم (لعرض جدول تفصيلي)
+        # نستخدم all() للحصول على كل العناصر، يمكن تحديد العدد لاحقاً إذا كان الأداء بطيئاً
+        for order in orders_qs:
+            products = order.products_data
+            if isinstance(products, str):
+                try:
+                    import json
+                    products = json.loads(products)
+                except:
+                    products = []
+            
+            for item in products:
+                # إذا كان هناك بحث محدد عن منتج، نتجاهل المنتجات الأخرى
+                if product_query:
+                    p_num = str(item.get('product_number', '')).strip().lower()
+                    # بحث دقيق لرقم المنتج
+                    if product_query != p_num:
+                        continue
+
+                qty = item.get('quantity_taken')
+                if qty is None:
+                    qty = item.get('quantity', 0)
+                
+                if int(qty) > 0:
+                    recipient_items.append({
+                        'date': order.created_at,
+                        'order_number': order.order_number,
+                        'order_id': order.id,
+                        'product_name': item.get('name', 'منتج'),
+                        'product_number': item.get('product_number', ''),
+                        'quantity': int(qty),
+                    })
+        
+        # ترتيب حسب التاريخ الأحدث
+        recipient_items.sort(key=lambda x: x['date'], reverse=True)
+    
+    # إحصائيات عامة
     total_orders = Order.objects.count()
     today_orders = Order.objects.filter(created_at__date=timezone.now().date()).count()
     total_quantities_taken = Order.objects.aggregate(
         total=db_models.Sum('total_quantities')
     )['total'] or 0
+
+    # 1. إحصائيات الرسم البياني: حركة السحب اليومية (آخر 30 يوم)
+    last_30_days = timezone.now() - timedelta(days=30)
+    daily_stats = (
+        Order.objects.filter(created_at__gte=last_30_days)
+        .annotate(date=TruncDate('created_at'))
+        .values('date')
+        .annotate(count=Count('id'), qty=Sum('total_quantities'))
+        .order_by('date')
+    )
+    
+    daily_labels = [s['date'].strftime('%Y-%m-%d') for s in daily_stats]
+    daily_counts = [s['count'] for s in daily_stats]
+    daily_qtys = [s['qty'] for s in daily_stats]
+
+    # 2. إحصائيات الرسم البياني: أكثر المستلمين نشاطاً (Top 5)
+    top_recipients = (
+        Order.objects.exclude(recipient_name__isnull=True)
+        .exclude(recipient_name='')
+        .values('recipient_name')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:5]
+    )
+    
+    recipient_labels = [s['recipient_name'] for s in top_recipients]
+    recipient_counts = [s['count'] for s in top_recipients]
     
     # إضافة Pagination - 20 طلب لكل صفحة
     paginator = Paginator(orders_qs, 20)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
     
-    return render(request, 'inventory_app/orders_list.html', {
+    context = {
         'orders': page_obj,
         'page_obj': page_obj,
         'total_orders': total_orders,
         'today_orders': today_orders,
-        'total_quantities_taken': total_quantities_taken
+        'total_quantities_taken': total_quantities_taken,
+        # بيانات الرسوم البيانية
+        'daily_labels': json.dumps(daily_labels),
+        'daily_counts': json.dumps(daily_counts),
+        'daily_qtys': json.dumps(daily_qtys),
+        'recipient_labels': json.dumps(recipient_labels),
+        'recipient_counts': json.dumps(recipient_counts),
+        'recipient_items': recipient_items, # السجل التفصيلي للمستلم
+    }
+    
+    return render(request, 'inventory_app/orders_list.html', context)
+
+
+@login_required
+def search_order_history(request):
+    """API للبحث الذكي في سجلات المنتجات داخل الطلبات"""
+    query = request.GET.get('q', '').strip()
+    if not query:
+        return JsonResponse({'success': False, 'error': 'No query provided'})
+    
+    # 1. البحث الأولي السريع: الطلبات التي يحتوي نصها (JSON) على كلمة البحث
+    candidates = Order.objects.filter(products_data__icontains=query)
+    
+    total_withdrawn = 0
+    recipients_map = {} # name -> count
+    dates_map = {} # date -> quantity
+    
+    # 2. الفحص الدقيق وحساب الكميات
+    for order in candidates:
+        try:
+            # products_data هو قائمة من القواميس
+            products = order.products_data
+            if isinstance(products, str):
+                import json
+                products = json.loads(products)
+                
+            for p in products:
+                # التحقق مما إذا كان هذا المنتج هو المقصود
+                p_name = str(p.get('name', '')).lower()
+                p_num = str(p.get('product_number', '')).strip().lower()
+                q_lower = query.lower()
+                
+                # بحث دقيق لرقم المنتج، أو جزئي للاسم
+                if q_lower == p_num or q_lower in p_name:
+                    # قد يكون المفتاح quantity أو quantity_taken حسب إصدار البيانات
+                    qty = int(p.get('quantity_taken', p.get('quantity', 0)))
+                    total_withdrawn += qty
+                    
+                    # تجميع المستلمين
+                    r_name = order.recipient_name or 'غير محدد'
+                    # نقوم بجمع الكميات بدلاً من عدد الطلبات
+                    recipients_map[r_name] = recipients_map.get(r_name, 0) + qty
+                    
+                    # تجميع التواريخ
+                    date_str = order.created_at.strftime('%Y-%m-%d')
+                    dates_map[date_str] = dates_map.get(date_str, 0) + qty
+        except Exception:
+            continue
+            
+    # تحضير النتائج
+    # إرجاع جميع المستلمين (بدون تقييد بـ 5)
+    sorted_recipients = sorted(recipients_map.items(), key=lambda x: x[1], reverse=True)
+    sorted_dates = sorted(dates_map.items())
+    
+    return JsonResponse({
+        'success': True,
+        'stats': {
+            'total_withdrawn': total_withdrawn,
+            'top_recipients': [{'name': k, 'count': v} for k, v in sorted_recipients],
+            'timeline': [{'date': k, 'qty': v} for k, v in sorted_dates]
+        }
     })
 
 
+@login_required
 def order_detail(request, order_id):
     """عرض تفاصيل طلبية محددة"""
     order = get_object_or_404(Order, id=order_id)
+    
+    # تصفية المنتجات إذا كان هناك بحث
+    product_query = request.GET.get('product_query', '').strip().lower()
+    
+    # تأكد من أن products_data هو قائمة (إذا كان نصاً)
+    if isinstance(order.products_data, str):
+        try:
+            import json
+            order.products_data = json.loads(order.products_data)
+        except:
+            order.products_data = []
+
+    # إذا كان هناك بحث، نقوم بتصفية القائمة
+    if product_query:
+        filtered_products = []
+        for p in order.products_data:
+            p_num = str(p.get('product_number', '')).strip().lower()
+            # بحث دقيق
+            if p_num == product_query:
+                filtered_products.append(p)
+        order.products_data = filtered_products
+
     return render(request, 'inventory_app/order_detail.html', {
         'order': order
     })
@@ -2404,6 +3121,242 @@ def delete_order(request, order_id):
             })
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
+
+@login_required
+def analytics_dashboard(request):
+    """عرض صفحة التحليلات الذكية"""
+    return render(request, 'inventory_app/analytics_dashboard.html')
+
+@login_required
+def get_analytics_data(request):
+    """API لجلب بيانات التحليلات المتقدمة"""
+    days = int(request.GET.get('days', 30))
+    end_date = timezone.now()
+    start_date = end_date - timedelta(days=days)
+    
+    # 1. Base Query
+    orders = Order.objects.filter(created_at__gte=start_date).order_by('created_at')
+    
+    # 2. KPIs Logic
+    total_orders = orders.count()
+    total_items = orders.aggregate(total=db_models.Sum('total_quantities'))['total'] or 0
+    
+    # Trend (Previous Period Comparison)
+    prev_start = start_date - timedelta(days=days)
+    prev_orders = Order.objects.filter(created_at__gte=prev_start, created_at__lt=start_date).count()
+    prev_items = Order.objects.filter(created_at__gte=prev_start, created_at__lt=start_date).aggregate(total=db_models.Sum('total_quantities'))['total'] or 0
+    
+    orders_trend = ((total_orders - prev_orders) / prev_orders * 100) if prev_orders > 0 else 100
+    items_trend = ((total_items - prev_items) / prev_items * 100) if prev_items > 0 else 100
+    
+    # 3. Product Analysis (Parsing JSON) & Busiest Day
+    import json
+    from collections import Counter, defaultdict
+    
+    product_counter = Counter()
+    product_names_map = {} # Map product_number -> name
+    day_counter = Counter()
+    recipient_counter = Counter()
+    
+    # Daily Aggregation for Charts
+    daily_stats = defaultdict(lambda: {'orders': 0, 'quantities': 0})
+    
+    for order in orders:
+        # Day Stats
+        day_str = order.created_at.strftime('%Y-%m-%d')
+        weekday = order.created_at.strftime('%A') # e.g., Monday
+        
+        daily_stats[day_str]['orders'] += 1
+        daily_stats[day_str]['quantities'] += order.total_quantities
+        
+        day_counter[weekday] += 1
+        
+        # Recipient Stats
+        if order.recipient_name:
+            recipient_counter[order.recipient_name] += order.total_quantities
+            
+        # Product Stats
+        products = order.products_data
+        if isinstance(products, str):
+            try:
+                products = json.loads(products)
+            except:
+                products = []
+        
+        for p in products:
+            p_name = p.get('name')
+            p_num = str(p.get('product_number', '')).strip()
+            
+            # --- Fix for 'Unknown' Name ---
+            if not p_name or p_name == 'Unknown' or p_name == '':
+                # Try to fetch from DB
+                if p_num:
+                    try:
+                        # Use cache or efficient query
+                        prod = Product.objects.filter(product_number=p_num).first()
+                        if prod:
+                            p_name = prod.name
+                        else:
+                            p_name = f"منتج {p_num}"
+                    except:
+                        p_name = f"منتج {p_num}"
+                else:
+                    p_name = "غير معروف"
+            
+            qty = int(p.get('quantity_taken', p.get('quantity', 0)))
+            
+            # Aggregate by Product Number instead of Name
+            if p_num:
+                product_counter[p_num] += qty
+                # Update name mapping
+                if p_num not in product_names_map or (p_name and p_name != "غير معروف"):
+                    product_names_map[p_num] = p_name
+            else:
+                # Fallback for items without number
+                product_counter["UNKNOWN_NUM"] += qty
+                product_names_map["UNKNOWN_NUM"] = p_name or "بدون رقم"
+
+    # 4. Preparing Chart Data
+    # Trend Chart
+    sorted_days = sorted(daily_stats.keys())
+    trend_labels = sorted_days
+    trend_orders = [daily_stats[d]['orders'] for d in sorted_days]
+    trend_qtys = [daily_stats[d]['quantities'] for d in sorted_days]
+    
+    # Busiest Day
+    busiest_day_name = day_counter.most_common(1)[0][0] if day_counter else "N/A"
+    busiest_day_avg = round(total_orders / days, 1) # Simple avg for now
+    
+    # Translate Days
+    days_map = {
+        'Saturday': 'السبت', 'Sunday': 'الأحد', 'Monday': 'الاثنين',
+        'Tuesday': 'الثلاثاء', 'Wednesday': 'الأربعاء', 'Thursday': 'الخميس',
+        'Friday': 'الجمعة'
+    }
+    translated_busiest = days_map.get(busiest_day_name, busiest_day_name)
+    
+    # Day Distribution Chart
+    day_labels = [days_map.get(d, d) for d in day_counter.keys()]
+    day_data = list(day_counter.values())
+    
+    # Top Products Chart (Top 10)
+    top_products = product_counter.most_common(10)
+    
+    # Prepare labels as "Number - Name"
+    prod_labels = []
+    for p_num, count in top_products:
+        p_name = product_names_map.get(p_num, '')
+        label = f"{p_num} - {p_name}" if p_name else p_num
+        prod_labels.append(label)
+        
+    prod_data = [p[1] for p in top_products]
+    
+    # Top Recipients (Top 5)
+    top_recipients = recipient_counter.most_common(5)
+    rec_labels = [r[0] for r in top_recipients]
+    rec_data = [r[1] for r in top_recipients]
+    
+    # 5. Smart Insights Generation
+    insights = []
+    
+    # Insight 1: Growth
+    if orders_trend > 10:
+        insights.append({
+            'icon': '🚀',
+            'title': 'نمو ملحوظ',
+            'description': f'زادت الطلبات بنسبة {orders_trend:.1f}% مقارنة بالفترة السابقة.'
+        })
+    elif orders_trend < -10:
+        insights.append({
+            'icon': '📉',
+            'title': 'تراجع في الطلب',
+            'description': f'انخفضت الطلبات بنسبة {abs(orders_trend):.1f}%.'
+        })
+        
+    # Insight 2: Top Product Dominance
+    if top_products:
+        top_p = top_products[0] # (num, count)
+        share = (top_p[1] / total_items * 100) if total_items > 0 else 0
+        if share > 20:
+            p_name = product_names_map.get(top_p[0], top_p[0])
+            insights.append({
+                'icon': '⭐',
+                'title': 'منتج مسيطر',
+                'description': f'المنتج "{p_name}" ({top_p[0]}) يمثل {share:.1f}% من إجمالي المسحوبات.'
+            })
+            
+    # Insight 3: Day Activity
+    if day_counter:
+        insights.append({
+            'icon': '📅',
+            'title': 'وقت الذروة',
+            'description': f'يعتبر يوم {translated_busiest} هو الأنشط بـ {day_counter[busiest_day_name]} طلب.'
+        })
+
+    # --- 6. 12-Hour Report Logging (Lazy Generation) ---
+    try:
+        from .models import AIInsightLog
+        last_report = AIInsightLog.objects.order_by('-created_at').first()
+        should_generate = True
+        
+        if last_report:
+            diff = timezone.now() - last_report.created_at
+            if diff.total_seconds() < 12 * 3600: # 12 hours
+                should_generate = False
+        
+        if should_generate and insights:
+            # Create summary report
+            report_data = {
+                'period_stats': {
+                    'orders': total_orders,
+                    'items': total_items,
+                    'trend': f"{orders_trend:.1f}%"
+                },
+                'insights': insights,
+                'top_products': [f"{p[0]} - {product_names_map.get(p[0], '')}" for p in top_products[:3]]
+            }
+            AIInsightLog.objects.create(
+                total_orders=total_orders,
+                total_items=total_items,
+                period_hours=12,
+                insights_data=report_data
+            )
+    except Exception as e:
+        print(f"Error logging AI report: {e}")
+
+    # Fetch History for UI
+    history_logs = []
+    try:
+        logs = AIInsightLog.objects.order_by('-created_at')[:5]
+        for log in logs:
+            history_logs.append({
+                'date': log.created_at.strftime('%Y-%m-%d %H:%M'),
+                'content': log.insights_data
+            })
+    except:
+        pass
+
+    return JsonResponse({
+        'success': True,
+        'kpis': {
+            'total_orders': total_orders,
+            'total_items': total_items,
+            'busiest_day': translated_busiest,
+            'busiest_day_avg': f"{total_orders/len(day_counter):.1f}" if day_counter else 0,
+            'top_product': prod_labels[0] if prod_labels else "N/A",
+            'top_product_qty': prod_data[0] if prod_data else 0,
+            'orders_trend': f"{orders_trend:+.1f}%",
+            'items_trend': f"{items_trend:+.1f}%"
+        },
+        'charts': {
+            'trend': {'labels': trend_labels, 'orders': trend_orders, 'quantities': trend_qtys},
+            'days': {'labels': day_labels, 'data': day_data},
+            'products': {'labels': prod_labels, 'data': prod_data},
+            'recipients': {'labels': rec_labels, 'data': rec_data}
+        },
+        'insights': insights,
+        'history': history_logs
+    })
 
 @login_required
 @require_http_methods(["POST"])
@@ -2448,36 +3401,7 @@ def reset_all_quantities(request):
         }, status=500)
 
 
-@require_http_methods(["POST"])
-def update_dozens_per_carton(request, product_id):
-    """تحديث عدد الدرازن في الكرتون"""
-    try:
-        import json
-        data = json.loads(request.body)
-        dozens_per_carton = data.get('dozens_per_carton')
-        
-        if not dozens_per_carton or dozens_per_carton < 1:
-            return JsonResponse({
-                'success': False,
-                'error': 'يجب أن يكون عدد الدرازن في الكرتون أكبر من 0'
-            }, status=400)
-        
-        product = get_object_or_404(Product, id=product_id)
-        product.dozens_per_carton = dozens_per_carton
-        product.save()
-        
-        return JsonResponse({
-            'success': True,
-            'message': 'تم تحديث عدد الدرازن في الكرتون بنجاح',
-            'dozens_per_carton': product.dozens_per_carton,
-            'total_dozens': product.get_total_dozens(),
-            'total_cartons': product.get_total_cartons()
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
+
 
 
 # ========== نظام المستخدمين والصلاحيات ==========
@@ -2611,6 +3535,7 @@ def register_staff(request):
             password = form.cleaned_data['password']
             email = form.cleaned_data['email']
             phone = form.cleaned_data['phone']
+            user_type = 'staff'  # تعيين تلقائي كـ موظف
             
             try:
                 # إنشاء المستخدم
@@ -2625,7 +3550,7 @@ def register_staff(request):
                     # إنشاء UserProfile
                     UserProfile.objects.create(
                         user=user,
-                        user_type='staff',
+                        user_type=user_type,
                         phone=phone,
                         is_active=True
                     )
@@ -2634,7 +3559,7 @@ def register_staff(request):
                 UserActivityLog.log_activity(
                     user=request.user,
                     action='user_created',
-                    description=f'تم إنشاء حساب موظف جديد: {username}',
+                    description=f'تم إنشاء حساب {user_type} جديد: {username}',
                     request=request,
                     object_type='User',
                     object_id=user.id,
@@ -2642,7 +3567,7 @@ def register_staff(request):
                 )
                 
                 logger.info(f'Admin {request.user.username} created new staff account: {username}')
-                messages.success(request, f'تم إنشاء حساب الموظف {username} بنجاح')
+                messages.success(request, f'تم إنشاء حساب {username} بنجاح')
                 return redirect('inventory_app:admin_dashboard')
                 
             except Exception as e:
@@ -2653,7 +3578,15 @@ def register_staff(request):
         else:
             # تسجيل أخطاء التحقق
             security_logger.warning(f'Invalid form data in register_staff from IP: {request.META.get("REMOTE_ADDR")}')
-            messages.error(request, 'يرجى التحقق من البيانات المدخلة')
+            messages.error(request, 'يرجى التحقق من البيانات المدخلة:')
+            for field, errors in form.errors.items():
+                # Get field label if available
+                field_label = field
+                if field in form.fields:
+                    field_label = form.fields[field].label or field
+                
+                for error in errors:
+                    messages.error(request, f"- {field_label}: {error}")
     else:
         form = RegisterStaffForm()
     
@@ -3051,7 +3984,15 @@ def edit_staff(request, user_id):
                 messages.error(request, f'حدث خطأ أثناء التحديث: {str(e)}')
         else:
             security_logger.warning(f'Invalid form data in edit_staff from IP: {request.META.get("REMOTE_ADDR")}')
-            messages.error(request, 'يرجى التحقق من البيانات المدخلة')
+            messages.error(request, 'يرجى التحقق من البيانات المدخلة:')
+            for field, errors in form.errors.items():
+                # Get field label if available
+                field_label = field
+                if field in form.fields:
+                    field_label = form.fields[field].label or field
+                    
+                for error in errors:
+                    messages.error(request, f"- {field_label}: {error}")
     else:
         form = EditStaffForm(initial={
             'username': staff_user.username,
@@ -3469,17 +4410,26 @@ def upload_excel_file(request):
                 if any(cell is not None for cell in row):  # تجاهل الصفوف الفارغة
                     data.append(list(row))
         
-        # حفظ البيانات في الجلسة للاستخدام لاحقاً
         request.session['excel_data'] = {
             'headers': headers,
-            'data': data[:100]  # أول 100 صف فقط للمعاينة
+            'data': data
         }
+        
+        total_rows = len(data)
+        # تم تحديث الحد المسموح به للمعاينة ليشمل كامل الملف
+        # هذا يضمن أن المستخدم يرى ويعالج جميع البيانات، خاصة للملفات المتوسطة الحجم (مثل 420 منتج)
+        preview_limit = total_rows
+        if total_rows > 5000:
+            # تنبيه: للملفات الكبيرة جداً، قد يكون الأداء بطيئاً في المتصفح
+            # لكننا سنسمح بذلك لضمان الدقة
+            preview_limit = total_rows
         
         return JsonResponse({
             'success': True,
             'headers': headers,
-            'data': data[:10],  # أول 10 صفوف للمعاينة
-            'total_rows': len(data)
+            'data': data[:min(preview_limit, 50)],
+            'total_rows': total_rows,
+            'preview_limit': preview_limit
         })
         
     except Exception as e:
@@ -3512,10 +4462,17 @@ def preview_excel_data(request):
                 return JsonResponse({'error': f'يجب تحديد عمود {field}'}, status=400)
         
         headers = excel_data['headers']
-        rows = excel_data['data']
+        total_rows = len(excel_data['data'])
         
-        # التحقق من وجود عمود FINAL_MODEL
+        # السماح بمعاينة كافة الصفوف
+        preview_limit = total_rows
+        
+        rows = excel_data['data'][:preview_limit]
+        
+        # التحقق من وجود أعمدة اختيارية
         has_final_model = 'final_model' in column_mapping and column_mapping['final_model'] is not None
+        has_name = 'name' in column_mapping and column_mapping['name'] is not None
+        has_category = 'category' in column_mapping and column_mapping['category'] is not None
         
         print(f"[DEBUG] Total rows in Excel: {len(rows)}")
         print(f"[DEBUG] Has FINAL_MODEL column: {has_final_model}")
@@ -3565,27 +4522,21 @@ def preview_excel_data(request):
                 except (IndexError, KeyError, ValueError):
                     total_quantity = None
                 
-                # حقول اختيارية: حبات/كرتون وعدد الكراتين
-                qty_per_carton = None
-                carton_count = None
+                # حقول اختيارية: الاسم والفئة
+                name_val = None
+                category_val = None
                 try:
-                    if 'qty_per_carton' in column_mapping and column_mapping['qty_per_carton'] is not None:
-                        qty_cell = row[column_mapping['qty_per_carton']]
-                        if qty_cell and isinstance(qty_cell, (int, float)):
-                            qty_per_carton = int(qty_cell)
-                        elif qty_cell and str(qty_cell).replace('.', '').replace('-', '').isdigit():
-                            qty_per_carton = int(float(qty_cell))
-                except (IndexError, KeyError, ValueError):
-                    qty_per_carton = None
+                    if 'name' in column_mapping and column_mapping['name'] is not None:
+                        nc = row[column_mapping['name']]
+                        name_val = str(nc).strip() if nc is not None else None
+                except Exception:
+                    name_val = None
                 try:
-                    if 'carton_count' in column_mapping and column_mapping['carton_count'] is not None:
-                        carton_cell = row[column_mapping['carton_count']]
-                        if carton_cell and isinstance(carton_cell, (int, float)):
-                            carton_count = int(carton_cell)
-                        elif carton_cell and str(carton_cell).replace('.', '').replace('-', '').isdigit():
-                            carton_count = int(float(carton_cell))
-                except (IndexError, KeyError, ValueError):
-                    carton_count = None
+                    if 'category' in column_mapping and column_mapping['category'] is not None:
+                        cc = row[column_mapping['category']]
+                        category_val = str(cc).strip() if cc is not None else None
+                except Exception:
+                    category_val = None
                 
                 # الموقع
                 location_str = None
@@ -3616,8 +4567,6 @@ def preview_excel_data(request):
                         'row': row_idx,
                         'original_number': str(product_number_cell).strip() if product_number_cell and str(product_number_cell).strip() else 'فارغ',
                         'final_number': final_product_number or 'فارغ',
-                        'qty_per_carton': qty_per_carton or 0,
-                        'carton_count': carton_count if carton_count is not None else 0,
                         'total_quantity': total_quantity or 0,
                         'location': location_str or '',
                         'status': 'error',
@@ -3635,25 +4584,34 @@ def preview_excel_data(request):
                     status = 'exists'
                     message = f'موجود مسبقاً (الكمية الحالية: {existing_product.quantity})'
                 
-                preview_data.append({
+                result_row = {
                     'row': row_idx,
                     'original_number': str(product_number_cell).strip() if product_number_cell else product_number,
                     'final_number': final_product_number,
-                    'qty_per_carton': qty_per_carton,
-                    'carton_count': carton_count,
                     'total_quantity': total_quantity,
                     'location': location_str or '',
                     'status': status,
                     'message': message
-                })
+                }
+                if has_name:
+                    try:
+                        name_cell = row[column_mapping['name']]
+                        result_row['name'] = str(name_cell).strip() if name_cell is not None else ''
+                    except Exception:
+                        result_row['name'] = ''
+                if has_category:
+                    try:
+                        category_cell = row[column_mapping['category']]
+                        result_row['category'] = str(category_cell).strip() if category_cell is not None else ''
+                    except Exception:
+                        result_row['category'] = ''
+                preview_data.append(result_row)
                 
             except Exception as e:
                 preview_data.append({
                     'row': row_idx,
                     'original_number': 'N/A',
                     'final_number': 'N/A',
-                    'qty_per_carton': 0,
-                    'carton_count': 0,
                     'total_quantity': 0,
                     'location': '',
                     'status': 'error',
@@ -3665,7 +4623,9 @@ def preview_excel_data(request):
         return JsonResponse({
             'success': True,
             'preview': preview_data,
-            'total_rows': len(preview_data)
+            'total_rows': len(preview_data),
+            'preview_limit': preview_limit,
+            'full_rows': total_rows
         })
         
     except Exception as e:
@@ -3674,6 +4634,7 @@ def preview_excel_data(request):
 
 @login_required
 @admin_required
+@transaction.atomic
 def process_excel_data(request):
     """معالجة البيانات من Excel وإضافتها للنظام"""
     if request.method != 'POST':
@@ -3720,6 +4681,8 @@ def process_excel_data(request):
         product_number_counter = {}
         
         # إذا كانت هناك بيانات معدلة، استخدمها بدلاً من قراءة Excel مرة أخرى
+        has_name = 'name' in column_mapping and column_mapping['name'] is not None
+        has_category = 'category' in column_mapping and column_mapping['category'] is not None
         if edited_data:
             print("[DEBUG] Using edited data from preview")
             for item in edited_data:
@@ -3731,9 +4694,20 @@ def process_excel_data(request):
                 
                 try:
                     product_number = item['final_number']
-                    qty_per_carton = item.get('qty_per_carton')
-                    carton_count = item.get('carton_count')
                     location_str = item.get('location', None)
+                    # استخراج الاسم والفئة إذا طُلبا
+                    name_val = None
+                    category_val = None
+                    try:
+                        src_row = rows[item['row'] - 2]
+                        if has_name and column_mapping['name'] is not None:
+                            nc = src_row[column_mapping['name']]
+                            name_val = str(nc).strip() if nc is not None else None
+                        if has_category and column_mapping['category'] is not None:
+                            cc = src_row[column_mapping['category']]
+                            category_val = str(cc).strip() if cc is not None else None
+                    except Exception:
+                        pass
                     
                     # إجمالي الكمية مباشرة
                     total_quantity = item['total_quantity']
@@ -3741,10 +4715,30 @@ def process_excel_data(request):
                     # معالجة الموقع
                     location = None
                     if location_str:
-                        try:
-                            location = Location.objects.get(code=location_str)
-                        except Location.DoesNotExist:
-                            pass
+                        # دعم صيغ متعددة مثل "R1C5" أو "R1-C5" أو "R1 C5"
+                        import re
+                        s = str(location_str).strip().upper()
+                        # تحويل أي فاصل غير حرفي إلى صيغة R..C..
+                        s = s.replace('-', ' ').replace('_', ' ')
+                        s = re.sub(r"\s+", "", s)
+                        match = re.match(r"R(\d+)C(\d+)", s)
+                        if match:
+                            row_num = int(match.group(1))
+                            col_num = int(match.group(2))
+                            warehouse = Warehouse.objects.first()
+                            if warehouse:
+                                location, _ = Location.objects.get_or_create(
+                                    warehouse=warehouse,
+                                    row=row_num,
+                                    column=col_num
+                                )
+                        else:
+                            # كاحتياط: إذا كانت القيمة رقمية فقط فتعامل معها كمُعرّف موقع
+                            if s.isdigit():
+                                try:
+                                    location = Location.objects.get(id=int(s))
+                                except Location.DoesNotExist:
+                                    location = None
                     
                     # التحقق من وجود المنتج
                     existing_product = Product.objects.filter(product_number=product_number).first()
@@ -3755,32 +4749,37 @@ def process_excel_data(request):
                             continue
                         elif conflict_resolution == 'update':
                             existing_product.quantity += total_quantity
-                            if qty_per_carton is not None:
-                                existing_product.qty_per_carton = qty_per_carton
-                            if carton_count is not None:
-                                existing_product.carton_count = carton_count
                             if location:
                                 existing_product.location = location
-                            existing_product.save(update_fields=['quantity', 'qty_per_carton', 'carton_count', 'location'])
+                            update_fields = ['quantity', 'location']
+                            if name_val:
+                                existing_product.name = name_val
+                                update_fields.append('name')
+                            if category_val:
+                                existing_product.category = category_val
+                                update_fields.append('category')
+                            existing_product.save(update_fields=update_fields)
                             results['updated'] += 1
                         elif conflict_resolution == 'replace':
                             existing_product.quantity = total_quantity
-                            if qty_per_carton is not None:
-                                existing_product.qty_per_carton = qty_per_carton
-                            if carton_count is not None:
-                                existing_product.carton_count = carton_count
                             if location:
                                 existing_product.location = location
-                            existing_product.save(update_fields=['quantity', 'qty_per_carton', 'carton_count', 'location'])
+                            update_fields = ['quantity', 'location']
+                            if name_val:
+                                existing_product.name = name_val
+                                update_fields.append('name')
+                            if category_val:
+                                existing_product.category = category_val
+                                update_fields.append('category')
+                            existing_product.save(update_fields=update_fields)
                             results['updated'] += 1
                     else:
                         # إنشاء منتج جديد
                         Product.objects.create(
                             product_number=product_number,
-                            name=product_number,
+                            name=(name_val or product_number),
+                            category=(category_val or None),
                             quantity=total_quantity,
-                            qty_per_carton=qty_per_carton if qty_per_carton is not None else None,
-                            carton_count=carton_count if carton_count is not None else None,
                             location=location
                         )
                         results['added'] += 1
@@ -3837,28 +4836,6 @@ def process_excel_data(request):
                 except (IndexError, KeyError, ValueError):
                     total_quantity = None
                 
-                # حقول اختيارية: حبات/كرتون وعدد الكراتين
-                qty_per_carton = None
-                carton_count = None
-                try:
-                    if 'qty_per_carton' in column_mapping and column_mapping['qty_per_carton'] is not None:
-                        qty_cell = row[column_mapping['qty_per_carton']]
-                        if qty_cell and isinstance(qty_cell, (int, float)):
-                            qty_per_carton = int(qty_cell)
-                        elif qty_cell and str(qty_cell).replace('.', '').replace('-', '').isdigit():
-                            qty_per_carton = int(float(qty_cell))
-                except (IndexError, KeyError, ValueError):
-                    qty_per_carton = None
-                try:
-                    if 'carton_count' in column_mapping and column_mapping['carton_count'] is not None:
-                        carton_cell = row[column_mapping['carton_count']]
-                        if carton_cell and isinstance(carton_cell, (int, float)):
-                            carton_count = int(carton_cell)
-                        elif carton_cell and str(carton_cell).replace('.', '').replace('-', '').isdigit():
-                            carton_count = int(float(carton_cell))
-                except (IndexError, KeyError, ValueError):
-                    carton_count = None
-                    
                 # حقول اختيارية
                 location_str = None
                 try:
@@ -3867,6 +4844,22 @@ def process_excel_data(request):
                         location_str = str(loc_cell).strip() if loc_cell else None
                 except (IndexError, KeyError):
                     location_str = None
+                
+                # حقول اختيارية: الاسم والفئة
+                name_val = None
+                category_val = None
+                try:
+                    if 'name' in column_mapping and column_mapping['name'] is not None:
+                        nc = row[column_mapping['name']]
+                        name_val = str(nc).strip() if nc is not None else None
+                except Exception:
+                    name_val = None
+                try:
+                    if 'category' in column_mapping and column_mapping['category'] is not None:
+                        cc = row[column_mapping['category']]
+                        category_val = str(cc).strip() if cc is not None else None
+                except Exception:
+                    category_val = None
                 
                 # تحديد رقم المنتج النهائي
                 if has_final_model and final_model:
@@ -3908,33 +4901,32 @@ def process_excel_data(request):
                     elif conflict_resolution == 'update':
                         # تحديث الكمية (إضافة)
                         existing_product.quantity += total_quantity
-                        if qty_per_carton is not None:
-                            existing_product.qty_per_carton = qty_per_carton
-                        if carton_count is not None:
-                            existing_product.carton_count = carton_count
                         if location:
                             existing_product.location = location
+                        if name_val:
+                            existing_product.name = name_val
+                        if category_val:
+                            existing_product.category = category_val
                         existing_product.save()
                         results['updated'] += 1
                     elif conflict_resolution == 'replace':
                         # استبدال الكمية
                         existing_product.quantity = total_quantity
-                        if qty_per_carton is not None:
-                            existing_product.qty_per_carton = qty_per_carton
-                        if carton_count is not None:
-                            existing_product.carton_count = carton_count
                         if location:
                             existing_product.location = location
+                        if name_val:
+                            existing_product.name = name_val
+                        if category_val:
+                            existing_product.category = category_val
                         existing_product.save()
                         results['updated'] += 1
                 else:
                     # منتج جديد
                     Product.objects.create(
                         product_number=final_product_number,
-                        name=final_product_number,
+                        name=(name_val or final_product_number),
+                        category=(category_val or None),
                         quantity=total_quantity,
-                        qty_per_carton=qty_per_carton if qty_per_carton is not None else None,
-                        carton_count=carton_count if carton_count is not None else None,
                         location=location
                     )
                     results['added'] += 1
@@ -3954,6 +4946,223 @@ def process_excel_data(request):
     except Exception as e:
         return JsonResponse({'error': f'خطأ في معالجة البيانات: {str(e)}'}, status=500)
 
+
+# ==================== دمج ملفات متعددة (Excel/JSON) ====================
+
+@login_required
+@admin_required
+def merge_files_page(request):
+    return render(request, 'inventory_app/merge_files.html')
+
+
+def _normalize_product_number(raw):
+    import re
+    if raw is None:
+        return ''
+    s = str(raw).strip()
+    return re.sub(r'[^A-Za-z0-9]', '', s).upper()
+
+
+def _extract_products_from_excel(file_obj):
+    from openpyxl import load_workbook
+    wb = load_workbook(file_obj, data_only=True)
+    ws = wb.active
+    headers = []
+    products = []
+    for row_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
+        if row_idx == 1:
+            headers = [str(c).strip().lower() if c is not None else '' for c in row]
+            continue
+        # heuristic mapping
+        # find product_number column
+        def _norm(s):
+            s = (s or '').strip().lower()
+            # إزالة المسافات وبعض العلامات فقط مع إبقاء الأحرف العربية
+            return ''.join(ch for ch in s if ch not in ' .,_-()[]{}\n\t')
+        def find_col(names):
+            norm_headers = [_norm(h) for h in headers]
+            for n in names:
+                nn = _norm(n)
+                # مطابقة كاملة أو تحتوي
+                for i, nh in enumerate(norm_headers):
+                    if nh == nn or (nn and nn in nh):
+                        return i
+            return None
+        pn_idx = find_col(['final_model', 'final model', 'model', 'product number', 'productnumber', 'رقم المنتج النهائي', 'رقم المنتج', 'موديل', 'الموديل'])
+        qty_idx = find_col(['total_quantity', 'total qty', 'total', 'quantity', 'qty', 't.qty', 'tqty', 'الاجمالي', 'اجمالي', 'الكمية', 'كمية'])
+        if qty_idx is None:
+            for i, h in enumerate(headers):
+                hn = _norm(h)
+                if 'qty' in hn or 'quantity' in hn or 'الكمية' in h or 'اجمالي' in h or 'الاجمالي' in h:
+                    qty_idx = i
+                    break
+        name_idx = find_col(['name', 'الاسم'])
+        if pn_idx is None and len(row) > 0:
+            # fallback: first non-empty cell treated as product number
+            try:
+                pn_idx = next(i for i, c in enumerate(row) if c is not None)
+            except StopIteration:
+                pn_idx = None
+        if pn_idx is None:
+            continue
+        product_number = str(row[pn_idx]).strip() if row[pn_idx] is not None else ''
+        name = str(row[name_idx]).strip() if (name_idx is not None and row[name_idx] is not None) else product_number
+        total_quantity = 0
+        if qty_idx is not None:
+            q = row[qty_idx]
+            if isinstance(q, (int, float)):
+                total_quantity = int(q)
+            elif q and str(q).replace('.', '').replace('-', '').isdigit():
+                try:
+                    total_quantity = int(float(q))
+                except Exception:
+                    total_quantity = 0
+        products.append({'product_number': product_number, 'name': name, 'quantity': total_quantity})
+    return products
+
+
+def _extract_products_from_json(file_obj):
+    import json as pyjson
+    text = file_obj.read().decode('utf-8') if hasattr(file_obj, 'read') else file_obj.decode('utf-8')
+    data = pyjson.loads(text)
+    products = []
+    # backup schema
+    if isinstance(data, dict) and 'products' in data and isinstance(data['products'], list):
+        for rec in data['products']:
+            if isinstance(rec, dict):
+                fields = rec.get('fields', {}) if 'fields' in rec else rec
+                pn = fields.get('product_number') or fields.get('final_model') or ''
+                name = fields.get('name') or pn
+                qty = fields.get('quantity') or 0
+                products.append({'product_number': pn, 'name': name, 'quantity': int(qty) if isinstance(qty, (int, float)) else 0})
+    elif isinstance(data, list):
+        for rec in data:
+            pn = rec.get('product_number') or rec.get('final_model') or ''
+            name = rec.get('name') or pn
+            qty = rec.get('quantity') or 0
+            products.append({'product_number': pn, 'name': name, 'quantity': int(qty) if isinstance(qty, (int, float)) else 0})
+    return products
+
+
+@login_required
+@admin_required
+@require_http_methods(["POST"])
+def merge_files_upload(request):
+    try:
+        files = request.FILES.getlist('files[]') or request.FILES.getlist('files')
+        if not files:
+            return JsonResponse({'success': False, 'error': 'يرجى اختيار ملفات'}, status=400)
+        all_items = []
+        for f in files:
+            fname = f.name.lower()
+            items = []
+            if fname.endswith(('.xlsx', '.xls')):
+                items = _extract_products_from_excel(f)
+            elif fname.endswith('.json'):
+                items = _extract_products_from_json(f)
+            else:
+                continue
+            for it in items:
+                it['source'] = f.name
+            all_items.extend(items)
+        # duplicates detection
+        groups = {}
+        for it in all_items:
+            key = _normalize_product_number(it.get('product_number'))
+            if not key:
+                continue
+            groups.setdefault(key, []).append(it)
+        duplicates = {k: v for k, v in groups.items() if len(v) > 1}
+        return JsonResponse({
+            'success': True,
+            'items': all_items,
+            'counts': {
+                'total': len(all_items),
+                'unique': len(groups),
+                'duplicates': len(duplicates)
+            },
+            'duplicates': duplicates
+        }, json_dumps_params={'ensure_ascii': False})
+    except Exception as e:
+        logger.error(f'Merge upload error: {str(e)}', exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@admin_required
+@require_http_methods(["POST"])
+def merge_files_process(request):
+    try:
+        import json as pyjson
+        body = pyjson.loads(request.body)
+        items = body.get('items', [])
+        auto_fix = body.get('auto_fix', 'merge')  # merge, rename
+        # consolidate
+        consolidated = {}
+        for it in items:
+            key = _normalize_product_number(it.get('product_number'))
+            if not key:
+                continue
+            if key not in consolidated:
+                consolidated[key] = {
+                    'product_number': it.get('product_number') or '',
+                    'name': it.get('name') or it.get('product_number') or '',
+                    'quantity': int(it.get('quantity') or 0)
+                }
+            else:
+                if auto_fix == 'merge':
+                    consolidated[key]['quantity'] += int(it.get('quantity') or 0)
+                elif auto_fix == 'rename':
+                    # keep separate by appending suffix
+                    # store as list of variants
+                    consolidated.setdefault('_variants', []).append(it)
+        result_list = list(consolidated.values())
+        # if rename, append variants with unique suffixes
+        if auto_fix == 'rename' and '_variants' in consolidated:
+            idx = 1
+            for it in consolidated['_variants']:
+                base = str(it.get('product_number') or '')
+                result_list.append({
+                    'product_number': f"{base}-{idx}",
+                    'name': it.get('name') or base,
+                    'quantity': int(it.get('quantity') or 0)
+                })
+                idx += 1
+        return JsonResponse({'success': True, 'items': result_list, 'total': len(result_list)})
+    except Exception as e:
+        logger.error(f'Merge process error: {str(e)}', exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@admin_required
+@require_http_methods(["POST"])
+def merge_files_export(request):
+    try:
+        import json as pyjson
+        export_format = request.POST.get('format', 'json')
+        items_json = request.POST.get('items')
+        items = pyjson.loads(items_json) if items_json else []
+        from django.http import HttpResponse
+        if export_format == 'excel':
+            from openpyxl import Workbook
+            wb = Workbook()
+            ws = wb.active
+            ws.title = 'المنتجات'
+            ws.append(['رقم المنتج', 'الاسم', 'الكمية'])
+            for it in items:
+                ws.append([it.get('product_number') or '', it.get('name') or '', int(it.get('quantity') or 0)])
+            resp = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            resp['Content-Disposition'] = 'attachment; filename="merged_products.xlsx"'
+            wb.save(resp)
+            return resp
+        else:
+            resp = HttpResponse(pyjson.dumps(items, ensure_ascii=False), content_type='application/json')
+            resp['Content-Disposition'] = 'attachment; filename="merged_products.json"'
+            return resp
+    except Exception as e:
+        logger.error(f'Merge export error: {str(e)}', exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 # ==================== Container Management ====================
 
@@ -4098,3 +5307,290 @@ def container_delete(request, container_id):
             'success': False,
             'error': str(e)
         }, status=500)
+def _load_backup_data(raw_bytes, filename):
+    data = None
+    parse_info = {'source': 'raw', 'encoding': None, 'fixes': []}
+    try:
+        if raw_bytes[:2] == b'PK' or (filename or '').lower().endswith('.zip'):
+            import zipfile, io
+            with zipfile.ZipFile(io.BytesIO(raw_bytes)) as zf:
+                json_members = [m for m in zf.namelist() if m.lower().endswith('.json')]
+                if not json_members:
+                    return None, {'error': 'zip_no_json'}
+                raw_bytes = zf.read(json_members[0])
+                parse_info['source'] = 'zip'
+    except Exception:
+        pass
+    import codecs, re
+    # BOM detection (wrapped)
+    try:
+        if raw_bytes.startswith(codecs.BOM_UTF8):
+            text = raw_bytes.decode('utf-8', errors='ignore')
+            parse_info['encoding'] = 'utf-8-bom'
+            t = re.sub(r"//.*?$", "", text, flags=re.MULTILINE)
+            t = re.sub(r"/\*.*?\*/", "", t, flags=re.DOTALL)
+            t = re.sub(r",\s*([}\]])", r"\1", t)
+            try:
+                return json.loads(t), parse_info
+            except Exception:
+                pass
+        elif raw_bytes.startswith(codecs.BOM_UTF16_LE):
+            text = raw_bytes.decode('utf-16-le', errors='ignore')
+            parse_info['encoding'] = 'utf-16-le-bom'
+            parse_info['fixes'].append('ignore_errors')
+            t = re.sub(r"//.*?$", "", text, flags=re.MULTILINE)
+            t = re.sub(r"/\*.*?\*/", "", t, flags=re.DOTALL)
+            t = re.sub(r",\s*([}\]])", r"\1", t)
+            try:
+                return json.loads(t), parse_info
+            except Exception:
+                pass
+        elif raw_bytes.startswith(codecs.BOM_UTF16_BE):
+            text = raw_bytes.decode('utf-16-be', errors='ignore')
+            parse_info['encoding'] = 'utf-16-be-bom'
+            parse_info['fixes'].append('ignore_errors')
+            t = re.sub(r"//.*?$", "", text, flags=re.MULTILINE)
+            t = re.sub(r"/\*.*?\*/", "", t, flags=re.DOTALL)
+            t = re.sub(r",\s*([}\]])", r"\1", t)
+            try:
+                return json.loads(t), parse_info
+            except Exception:
+                pass
+    except Exception:
+        pass
+    # Try encodings list
+    encodings = ['utf-8', 'utf-8-sig', 'cp1256', 'windows-1256', 'latin1', 'utf-16', 'utf-16le', 'utf-16be', 'utf-32', 'utf-32le', 'utf-32be']
+    last_err = None
+    for enc in encodings:
+        for err_mode in ['strict', 'ignore']:
+            try:
+                text = raw_bytes.decode(enc, errors=err_mode)
+                parse_info['encoding'] = enc if err_mode == 'strict' else f'{enc}-ignore'
+                # Clean and slice
+                t = text.lstrip('\ufeff')
+                t = re.sub(r"//.*?$", "", t, flags=re.MULTILINE)
+                t = re.sub(r"/\*.*?\*/", "", t, flags=re.DOTALL)
+                t = re.sub(r",\s*([}\]])", r"\1", t)
+                try:
+                    if err_mode == 'ignore':
+                        parse_info['fixes'].append('ignore_errors')
+                    parse_info['fixes'].append('clean')
+                    return json.loads(t), parse_info
+                except Exception as e2:
+                    last_err = str(e2)
+                    try:
+                        s = t.find('{')
+                        epos = t.rfind('}')
+                        if s != -1 and epos != -1 and epos > s:
+                            t2 = t[s:epos+1]
+                            parse_info['fixes'].append('slice')
+                            return json.loads(t2), parse_info
+                    except Exception as e3:
+                        last_err = str(e3)
+            except Exception as e:
+                last_err = str(e)
+                continue
+    # Binary brace slice fallback
+    try:
+        s = raw_bytes.find(b'{')
+        epos = raw_bytes.rfind(b'}')
+        if s != -1 and epos != -1 and epos > s:
+            segment = raw_bytes[s:epos+1]
+            for enc in encodings:
+                try:
+                    t = segment.decode(enc, errors='ignore')
+                    t = re.sub(r"//.*?$", "", t, flags=re.MULTILINE)
+                    t = re.sub(r"/\*.*?\*/", "", t, flags=re.DOTALL)
+                    t = re.sub(r",\s*([}\]])", r"\1", t)
+                    parse_info['encoding'] = f'{enc}-segment-ignore'
+                    parse_info['fixes'].append('binary_slice')
+                    return json.loads(t), parse_info
+                except Exception:
+                    continue
+    except Exception as e:
+        last_err = str(e)
+    return None, {'error': 'json_invalid', 'message': last_err}
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@login_required
+def compact_row(request):
+    """
+    إعادة ترتيب المنتجات في صف معين لملء الفراغات.
+    يتم نقل المنتجات من الخلايا البعيدة إلى الخلايا الفارغة الأقرب للبداية (العمود 1).
+    """
+    try:
+        data = json.loads(request.body)
+        row_number = int(data.get('row'))
+        warehouse_id = data.get('warehouse_id')
+        
+        if warehouse_id:
+            warehouse = get_object_or_404(Warehouse, id=warehouse_id)
+        else:
+            warehouse = Warehouse.objects.first()
+            
+        if not warehouse:
+             return JsonResponse({'success': False, 'error': 'لم يتم العثور على مستودع'})
+
+        with transaction.atomic():
+            # 1. جلب جميع المواقع في هذا الصف مرتبة حسب العمود
+            locations = list(Location.objects.filter(
+                warehouse=warehouse, 
+                row=row_number
+            ).order_by('column').prefetch_related('products'))
+            
+            if not locations:
+                return JsonResponse({'success': False, 'error': 'الصف غير موجود'})
+            
+            # حفظ الحالة السابقة للتراجع
+            undo_data = []
+            for loc in locations:
+                for product in loc.products.all():
+                    undo_data.append({
+                        'product_id': product.id,
+                        'location_id': loc.id
+                    })
+            
+            # حفظ في الجلسة
+            request.session['last_compaction_undo'] = {
+                'type': 'row',
+                'id': row_number,
+                'data': undo_data,
+                'timestamp': timezone.now().isoformat()
+            }
+
+            # 2. تحديد المواقع التي تحتوي على منتجات (المشغولة)
+            # نحتاج إلى قائمة بمحتويات المواقع المشغولة
+            occupied_contents = []
+            
+            for loc in locations:
+                # نستخدم all() لجلب جميع المنتجات في الموقع
+                products = list(loc.products.all())
+                if products:
+                    occupied_contents.append(products)
+            
+            # 3. إعادة توزيع المحتويات على المواقع الأولى
+            updates_count = 0
+            
+            # نقل المحتويات إلى المواقع الجديدة
+            for i, content_products in enumerate(occupied_contents):
+                if i < len(locations):
+                    target_loc = locations[i]
+                    
+                    # التحقق وتحديث الموقع لكل منتج في المجموعة
+                    # نفترض أن المنتجات في نفس المجموعة تبقى معاً
+                    for product in content_products:
+                        if product.location_id != target_loc.id:
+                            product.location = target_loc
+                            product.save()
+                            updates_count += 1
+            
+            return JsonResponse({
+                'success': True, 
+                'message': f'تم إعادة ترتيب الصف {row_number} بنجاح.',
+                'can_undo': True
+            })
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@login_required
+def compact_column(request):
+    """ضغط العمود (إزالة الفراغات)"""
+    try:
+        data = json.loads(request.body)
+        col_num = int(data.get('column'))
+        
+        warehouse = Warehouse.objects.first()
+        if not warehouse:
+            return JsonResponse({'success': False, 'error': 'المستودع غير موجود'})
+        
+        with transaction.atomic():
+            # الحصول على جميع مواقع العمود مرتبة حسب الصف
+            locations = list(Location.objects.filter(
+                warehouse=warehouse, 
+                column=col_num
+            ).order_by('row').prefetch_related('products'))
+            
+            # حفظ الحالة السابقة للتراجع
+            undo_data = []
+            for loc in locations:
+                for product in loc.products.all():
+                    undo_data.append({
+                        'product_id': product.id,
+                        'location_id': loc.id
+                    })
+            
+            # حفظ في الجلسة
+            request.session['last_compaction_undo'] = {
+                'type': 'column',
+                'id': col_num,
+                'data': undo_data,
+                'timestamp': timezone.now().isoformat()
+            }
+            
+            # تجميع المنتجات من المواقع المشغولة
+            occupied_groups = []
+            for loc in locations:
+                products = list(loc.products.all())
+                if products:
+                    occupied_groups.append(products)
+            
+            # إعادة توزيع المنتجات على المواقع الأولى (من الأعلى للأسفل)
+            for i, group in enumerate(occupied_groups):
+                target_location = locations[i]
+                
+                for product in group:
+                    if product.location_id != target_location.id:
+                        product.location = target_location
+                        product.save(update_fields=['location'])
+            
+        return JsonResponse({'success': True, 'message': f'تم إعادة ترتيب العمود {col_num} بنجاح', 'can_undo': True})
+    
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'بيانات غير صالحة'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'حدث خطأ: {str(e)}'})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@login_required
+def revert_compaction(request):
+    """التراجع عن آخر عملية ترتيب"""
+    try:
+        undo_info = request.session.get('last_compaction_undo')
+        if not undo_info:
+            return JsonResponse({'success': False, 'error': 'لا توجد عملية للتراجع عنها'})
+        
+        undo_data = undo_info.get('data', [])
+        if not undo_data:
+            return JsonResponse({'success': False, 'error': 'بيانات التراجع فارغة'})
+        
+        with transaction.atomic():
+            # أولاً: نحصل على جميع معرفات المنتجات المتأثرة
+            product_ids = [item['product_id'] for item in undo_data]
+            
+            # نحصل على المنتجات الحالية
+            products_map = {p.id: p for p in Product.objects.filter(id__in=product_ids)}
+            
+            # إعادة المنتجات لمواقعها الأصلية
+            for item in undo_data:
+                product = products_map.get(item['product_id'])
+                if product:
+                    product.location_id = item['location_id']
+                    product.save(update_fields=['location'])
+            
+            # مسح بيانات التراجع
+            del request.session['last_compaction_undo']
+            request.session.modified = True
+        
+        type_str = "الصف" if undo_info['type'] == 'row' else "العمود"
+        return JsonResponse({'success': True, 'message': f'تم التراجع عن ترتيب {type_str} {undo_info["id"]} بنجاح'})
+    
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'حدث خطأ أثناء التراجع: {str(e)}'})

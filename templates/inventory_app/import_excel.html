@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>استيراد المنتجات من Excel</title>
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <style>
         * {
             margin: 0;
@@ -391,15 +392,8 @@
                     </div>
 
                     <div class="mapping-item">
-                        <label>عدد الحبات في الكرتون (QTY/CTN) *</label>
-                        <select id="qtyPerCartonColumn" required>
-                            <option value="">-- اختر العمود --</option>
-                        </select>
-                    </div>
-
-                    <div class="mapping-item">
-                        <label>عدد الكراتين (CTN) *</label>
-                        <select id="cartonCountColumn" required>
+                        <label>الإجمالي (T.QTY) *</label>
+                        <select id="totalQuantityColumn" required>
                             <option value="">-- اختر العمود --</option>
                         </select>
                     </div>
@@ -407,7 +401,21 @@
                     <div class="mapping-item">
                         <label>الموقع (LOCATION) - اختياري</label>
                         <select id="locationColumn">
-                            <option value="">-- اختر العمود --</option>
+                            <option value="">-- اختياري --</option>
+                        </select>
+                    </div>
+
+                    <div class="mapping-item">
+                        <label>الاسم (NAME) - اختياري</label>
+                        <select id="nameColumn">
+                            <option value="">-- اختياري --</option>
+                        </select>
+                    </div>
+
+                    <div class="mapping-item">
+                        <label>الفئة (CATEGORY) - اختياري</label>
+                        <select id="categoryColumn">
+                            <option value="">-- اختياري --</option>
                         </select>
                     </div>
                 </div>
@@ -472,8 +480,6 @@
                                     <th>الصف</th>
                                     <th>رقم المنتج الأصلي (MODEL)</th>
                                     <th>رقم المنتج النهائي (FINAL MODEL)</th>
-                                    <th>حبات/كرتون</th>
-                                    <th>عدد الكراتين</th>
                                     <th>الإجمالي</th>
                                     <th>الموقع</th>
                                     <th>الحالة</th>
@@ -618,16 +624,16 @@
             const selectors = [
                 'productNumberColumn',
                 'finalModelColumn',
-                'qtyPerCartonColumn',
-                'cartonCountColumn',
-                'locationColumn'
+                'totalQuantityColumn',
+                'locationColumn',
+                'nameColumn',
+                'categoryColumn'
             ];
 
             selectors.forEach(selectorId => {
                 const select = document.getElementById(selectorId);
-                const isOptional = selectorId === 'finalModelColumn' || selectorId === 'locationColumn';
+                const isOptional = selectorId === 'finalModelColumn' || selectorId === 'locationColumn' || selectorId === 'nameColumn' || selectorId === 'categoryColumn';
                 select.innerHTML = isOptional ? '<option value="">-- اختياري --</option>' : '<option value="">-- اختر العمود --</option>';
-                
                 excelHeaders.forEach((header, index) => {
                     const option = document.createElement('option');
                     option.value = index;
@@ -640,19 +646,19 @@
         function previewData() {
             const productNumberCol = document.getElementById('productNumberColumn').value;
             const finalModelCol = document.getElementById('finalModelColumn').value;
-            const qtyPerCartonCol = document.getElementById('qtyPerCartonColumn').value;
-            const cartonCountCol = document.getElementById('cartonCountColumn').value;
+            const totalQuantityCol = document.getElementById('totalQuantityColumn').value;
             const locationCol = document.getElementById('locationColumn').value;
+            const nameCol = document.getElementById('nameColumn').value;
+            const categoryCol = document.getElementById('categoryColumn').value;
 
-            if (!productNumberCol || !qtyPerCartonCol || !cartonCountCol) {
+            if (!productNumberCol || !totalQuantityCol) {
                 alert('يجب تحديد جميع الحقول المطلوبة (*)');
                 return;
             }
 
             const columnMapping = {
                 product_number: parseInt(productNumberCol),
-                qty_per_carton: parseInt(qtyPerCartonCol),
-                carton_count: parseInt(cartonCountCol)
+                total_quantity: parseInt(totalQuantityCol)
             };
 
             if (finalModelCol) {
@@ -661,6 +667,12 @@
 
             if (locationCol) {
                 columnMapping.location = parseInt(locationCol);
+            }
+            if (nameCol) {
+                columnMapping.name = parseInt(nameCol);
+            }
+            if (categoryCol) {
+                columnMapping.category = parseInt(categoryCol);
             }
 
             document.getElementById('loading').classList.remove('hidden');
@@ -758,8 +770,7 @@
                     <td>${item.row}</td>
                     <td><strong>${item.original_number}</strong></td>
                     <td><strong style="color: #667eea;">${item.final_number}</strong></td>
-                    <td>${item.qty_per_carton}</td>
-                    <td>${item.carton_count}</td>
+
                     <td><strong>${item.total_quantity}</strong></td>
                     <td>${item.location || '-'}</td>
                     <td>
@@ -798,15 +809,15 @@
 
             const productNumberCol = document.getElementById('productNumberColumn').value;
             const finalModelCol = document.getElementById('finalModelColumn').value;
-            const qtyPerCartonCol = document.getElementById('qtyPerCartonColumn').value;
-            const cartonCountCol = document.getElementById('cartonCountColumn').value;
+            const totalQuantityCol = document.getElementById('totalQuantityColumn').value;
             const locationCol = document.getElementById('locationColumn').value;
+            const nameCol = document.getElementById('nameColumn').value;
+            const categoryCol = document.getElementById('categoryColumn').value;
             const conflictResolution = document.querySelector('input[name="conflictResolution"]:checked').value;
 
             const columnMapping = {
                 product_number: parseInt(productNumberCol),
-                qty_per_carton: parseInt(qtyPerCartonCol),
-                carton_count: parseInt(cartonCountCol)
+                total_quantity: parseInt(totalQuantityCol)
             };
 
             if (finalModelCol) {
@@ -815,6 +826,12 @@
 
             if (locationCol) {
                 columnMapping.location = parseInt(locationCol);
+            }
+            if (nameCol) {
+                columnMapping.name = parseInt(nameCol);
+            }
+            if (categoryCol) {
+                columnMapping.category = parseInt(categoryCol);
             }
 
             document.getElementById('loading').classList.remove('hidden');
@@ -889,4 +906,3 @@
     </script>
 </body>
 </html>
-

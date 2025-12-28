@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>قائمة المنتجات</title>
     {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
     <link rel="stylesheet" href="{% static 'css/quick_search.css' %}">
@@ -73,6 +74,20 @@
                 grid-template-columns: 1fr 1fr;
                 gap: 6px;
             }
+            .list-actions {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            .list-actions .fixed-actions {
+                width: 100%;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+            .list-actions .fixed-actions .btn {
+                width: 100%;
+            }
             #actions-toggle {
                 width: 100%;
             }
@@ -99,12 +114,174 @@
             border-collapse: collapse;
             background: white;
             border-radius: 8px;
-            overflow: hidden;
+            /* overflow: hidden; تم إزالته للسماح بظهور القوائم المنسدلة */
+            table-layout: fixed; /* لضمان احترام العرض المحدد للأعمدة */
         }
         th, td {
-            padding: 15px;
-            text-align: right;
+            padding: 12px 5px;
+            text-align: center; /* توسيط النص في جميع الخلايا */
             border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+            word-wrap: break-word; /* السماح بلف النص الطويل */
+        }
+        
+        /* New Styles for Mobile Actions */
+        .desktop-only { display: inline-flex; }
+        .mobile-only { display: none; }
+        
+        @media (max-width: 768px) {
+            .desktop-only { display: none !important; }
+            .mobile-only { display: flex !important; }
+            
+            .mobile-actions-bar {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                width: 100%;
+                gap: 10px;
+                margin-bottom: 10px;
+            }
+            
+            .action-dropdown {
+                position: relative;
+                display: inline-block;
+            }
+            
+            .action-dropdown-content {
+                display: none;
+                position: absolute;
+                left: 0; 
+                top: 100%;
+                background-color: white;
+                min-width: 220px;
+                box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+                z-index: 1000;
+                border-radius: 8px;
+                border: 1px solid #e5e7eb;
+                flex-direction: column;
+                max-height: 60vh; /* تحديد أقصى ارتفاع */
+                overflow-y: auto; /* تمكين التمرير الداخلي */
+                -webkit-overflow-scrolling: touch; /* تحسين التمرير على الهواتف */
+            }
+            
+            /* تحسين شريط التمرير */
+            .action-dropdown-content::-webkit-scrollbar {
+                width: 6px;
+            }
+            .action-dropdown-content::-webkit-scrollbar-track {
+                background: #f1f1f1;
+            }
+            .action-dropdown-content::-webkit-scrollbar-thumb {
+                background: #888;
+                border-radius: 3px;
+            }
+            
+            .action-dropdown-content.show {
+                display: flex;
+            }
+            
+            .action-dropdown-content a, .action-dropdown-content button {
+                padding: 12px 16px;
+                text-decoration: none;
+                display: block;
+                color: #374151;
+                border-bottom: 1px solid #f3f4f6;
+                text-align: right;
+                background: none;
+                border: none;
+                width: 100%;
+                font-size: 0.95rem;
+                cursor: pointer;
+            }
+            
+            /* Kebab Menu for Rows */
+            .kebab-menu-container {
+                position: relative;
+                display: flex;
+                justify-content: center;
+            }
+            
+            .kebab-btn {
+                background: none;
+                border: none;
+                font-size: 1.4rem;
+                cursor: pointer;
+                color: #4b5563;
+                padding: 0 10px;
+            }
+            
+            .kebab-dropdown {
+                display: none;
+                position: fixed; /* تغيير إلى fixed لتجنب القص داخل الجدول */
+                left: 0;
+                bottom: 0;
+                top: auto;
+                width: 100%;
+                background: white;
+                border-top: 1px solid #e5e7eb;
+                border-radius: 16px 16px 0 0;
+                box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+                z-index: 2000;
+                flex-direction: column;
+                padding: 10px 0 20px 0;
+                animation: slideUp 0.3s ease-out;
+            }
+            
+            @keyframes slideUp {
+                from { transform: translateY(100%); }
+                to { transform: translateY(0); }
+            }
+            
+            .kebab-dropdown.show {
+                display: flex;
+            }
+            
+            .kebab-dropdown a, .kebab-dropdown button {
+                padding: 15px 20px; /* زيادة المساحة للنقر */
+                text-align: center; /* توسيط النص */
+                border-bottom: 1px solid #f3f4f6;
+                color: #374151;
+                text-decoration: none;
+                font-size: 1rem;
+                background: none;
+                border: none;
+                width: 100%;
+                cursor: pointer;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            /* إضافة زر إغلاق للقائمة */
+            .kebab-close-btn {
+                padding: 10px;
+                text-align: center;
+                color: #ef4444;
+                font-weight: bold;
+                cursor: pointer;
+                border-top: 4px solid #f3f4f6;
+            }
+        }
+        
+        /* تنسيق أعمدة الجدول - توزيع متساوي وأنيق للشاشات الكبيرة */
+        /* 1. عمود التحديد: مساحة ثابتة صغيرة */
+        th:nth-child(1), td:nth-child(1) { width: 40px; } 
+        
+        /* 4. عمود الصورة: مساحة ثابتة */
+        th:nth-child(4), td:nth-child(4) { width: 70px; } 
+
+        /* باقي الأعمدة (7 أعمدة) تتشارك المساحة المتبقية بالتساوي */
+        th:nth-child(2), td:nth-child(2), /* رقم المنتج */
+        th:nth-child(3), td:nth-child(3), /* الاسم */
+        th:nth-child(5), td:nth-child(5), /* السعر */
+        th:nth-child(6), td:nth-child(6), /* الحاوية */
+        th:nth-child(7), td:nth-child(7), /* الكمية */
+        th:nth-child(8), td:nth-child(8), /* الأماكن */
+        th:nth-child(9), td:nth-child(9) /* الإجراءات */
+        {
+            /* استخدام calc لتوزيع المساحة المتبقية بالتساوي */
+            width: calc((100% - 110px) / 7);
         }
         th {
             background: var(--primary-color);
@@ -121,9 +298,19 @@
             font-weight: 600;
             border: 1px solid transparent;
         }
+        .color-dot {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 1px solid #e5e7eb;
+        }
         
         /* Responsive table */
         @media (max-width: 768px) {
+            /* إعادة تعيين عرض الأعمدة للهواتف */
+            th, td { width: auto !important; }
+
             .page-header {
                 flex-direction: column;
                 align-items: stretch;
@@ -144,6 +331,22 @@
             .search-box {
                 flex-direction: column;
             }
+            .search-box form {
+                display: grid !important;
+                grid-template-columns: 70% 30%;
+                gap: 8px;
+                width: 100%;
+            }
+            .search-box input[name="search"] {
+                width: 100%;
+            }
+            .search-box button[type="submit"] {
+                width: 100%;
+            }
+            .search-box .btn-secondary {
+                grid-column: 1 / -1;
+                justify-self: start;
+            }
             
             table {
                 font-size: 0.85rem;
@@ -155,22 +358,46 @@
             }
             
             /* إخفاء الأعمدة غير المهمة على الهواتف */
-            /* إخفاء: Checkbox, الاسم, الفئة, الحاوية, درزن/كرتون, التفاصيل, الأماكن */
-            th:nth-child(1), /* Checkbox */
-            td:nth-child(1),
+            /* إبقاء: Checkbox(1), رقم المنتج(2), الصورة(4), الكمية(7), الإجراءات(9) */
             th:nth-child(3), /* الاسم */
             td:nth-child(3),
-            th:nth-child(5), /* الفئة */
+            th:nth-child(5), /* السعر */
             td:nth-child(5),
             th:nth-child(6), /* الحاوية */
             td:nth-child(6),
-            th:nth-child(8), /* درزن/كرتون */
-            td:nth-child(8),
-            th:nth-child(9), /* التفاصيل */
-            td:nth-child(9),
-            th:nth-child(10), /* الأماكن */
-            td:nth-child(10) {
+            th:nth-child(8), /* الأماكن */
+            td:nth-child(8) {
                 display: none;
+            }
+            
+            /* تخصيص العرض للأعمدة: عمود التحديد ثابت، والباقي بالتساوي */
+            th:nth-child(1), td:nth-child(1) {
+                width: 30px !important;
+                padding: 8px 2px !important;
+            }
+
+            /* توزيع المساحة بالتساوي على الأعمدة الأربعة المتبقية */
+            th:nth-child(2), td:nth-child(2), /* رقم المنتج */
+            th:nth-child(4), td:nth-child(4), /* الصورة */
+            th:nth-child(7), td:nth-child(7), /* الكمية */
+            th:nth-child(9), td:nth-child(9) { /* الإجراءات */
+                width: 22% !important; /* (100% - 30px) / 4 تقريباً */
+                text-align: center !important;
+                vertical-align: middle !important;
+            }
+            
+            /* تنسيق رقم المنتج داخل العمود */
+            th:nth-child(2), td:nth-child(2) {
+                font-size: 0.8rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            /* تنسيق الكمية */
+            td:nth-child(7) {
+                font-weight: bold;
+                font-size: 0.85rem;
             }
             
             /* تصغير أزرار الإجراءات */
@@ -198,15 +425,11 @@
             
             /* جعل رقم المنتج أكبر وأوضح */
             td:nth-child(2) strong {
-                font-size: 0.95rem;
+                font-size: 0.85rem;
                 color: #667eea;
             }
             
-            /* جعل الكمية أوضح */
-            td:nth-child(6) {
-                font-weight: 600;
-                color: #059669;
-            }
+            /* تم إخفاء الكمية، لا حاجة لتنسيقها */
         }
         
         @media (max-width: 480px) {
@@ -259,7 +482,7 @@
             }
             
             /* تحسين عرض الكمية */
-            td:nth-child(6) {
+            td:nth-child(7) {
                 font-size: 0.85rem;
                 font-weight: 700;
             }
@@ -287,6 +510,50 @@
                 padding: 8px 12px;
             }
         }
+        
+        /* تنسيق النافذة المنبثقة للصورة (Modal) */
+        .image-modal {
+            display: none; /* مخفي افتراضياً */
+            position: fixed;
+            z-index: 10000; /* فوق كل شيء */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: rgba(0,0,0,0.85); /* خلفية معتمة */
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+        
+        .image-modal-content {
+            width: 50vw; /* 50% من عرض الشاشة كما طلبت */
+            max-height: 80vh;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            animation: zoomIn 0.3s ease-out;
+            cursor: default; /* المؤشر العادي عند المرور على الصورة */
+        }
+        
+        /* تأثير التكبير */
+        @keyframes zoomIn {
+            from {transform: scale(0.5); opacity: 0;}
+            to {transform: scale(1); opacity: 1;}
+        }
+        
+        /* تنسيق الصورة المصغرة لتوضيح أنها قابلة للنقر */
+        .product-thumbnail {
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .product-thumbnail:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 10;
+            position: relative;
+        }
     </style>
 </head>
 <body>
@@ -309,9 +576,6 @@
         <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow-md); margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h3 style="margin: 0; color: #1f2937; font-size: 1.1rem;">📦 إدارة الحاويات</h3>
-                <button onclick="showAddContainerModal()" class="btn btn--sm" style="background: #10b981; color: white;">
-                    ➕ إضافة حاوية جديدة
-                </button>
             </div>
             
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -328,9 +592,7 @@
                 <button onclick="assignToContainer()" class="btn btn--sm btn--primary">
                     ✓ تطبيق
                 </button>
-                <a href="{% url 'inventory_app:container_list' %}" class="btn btn--sm" style="background: #6366f1; color: white;">
-                    📋 إدارة الحاويات
-                </a>
+                
             </div>
             
             <div id="selected-count" style="margin-top: 10px; color: #6b7280; font-size: 0.9rem;">
@@ -400,26 +662,53 @@
         <!-- قائمة المنتجات -->
         <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow-lg);">
             <div class="list-actions" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
-                <div class="fixed-actions">
-                    {% if not show_all and total_count > 100 %}
-                        <a href="?show_all=true{% if search %}&search={{ search }}{% endif %}" class="btn btn--sm" style="background: #10b981; color: white;">📋 عرض جميع المنتجات</a>
-                    {% elif show_all %}
-                        <a href="?{% if search %}search={{ search }}{% endif %}" class="btn btn--sm" style="background: #6366f1; color: white;">📄 عرض بالصفحات</a>
-                    {% endif %}
-                    <button id="delete-fixed-btn" class="btn btn--sm btn--danger" onclick="deleteSelectedProducts()" style="display: none;">
-                        <span class="icon">🗑️</span>
-                        <span id="delete-fixed-count">حذف المحدد (0)</span>
-                    </button>
+                
+                <!-- Desktop View -->
+                <div class="desktop-only" style="width: 100%; justify-content: space-between; align-items: center;">
+                    <div class="fixed-actions">
+                         <button id="delete-fixed-btn" class="btn btn--sm btn--danger" onclick="deleteSelectedProducts()" style="display: none;">
+                            <span class="icon">🗑️</span>
+                            <span id="delete-fixed-count">حذف المحدد (0)</span>
+                        </button>
+                    </div>
+                    <div class="fixed-actions" style="gap: 8px;">
+                        <a href="{% url 'inventory_app:export_products_pdf' %}" class="btn btn--sm" target="_blank" style="background: #334155; color: white;">🧾 تصدير PDF</a>
+                        <a href="{% url 'inventory_app:export_products_excel' %}" class="btn btn--sm" style="background: #0ea5e9; color: white;">📥 تصدير Excel</a>
+                        <a href="{% url 'inventory_app:import_products_excel' %}" class="btn btn--sm" style="background: #22c55e; color: white;">📤 استيراد من Excel</a>
+                        <button class="btn btn--sm" onclick="resetAllQuantities()" style="background: #f59e0b; color: white;">↺ تصفير جميع الكميات</button>
+                        <a href="{% url 'inventory_app:container_list' %}" class="btn btn--sm" style="background: #6366f1; color: white;">📋 إدارة الحاويات</a>
+                        {% if selected_container %}
+                            <a href="{% url 'inventory_app:products_list' %}" class="btn btn--sm" style="background: #ef4444; color: white;">✕ إلغاء الفلترة</a>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="fixed-actions" style="gap: 8px;">
-                    <a href="{% url 'inventory_app:export_products_pdf' %}" class="btn btn--sm" target="_blank" style="background: #334155; color: white;">🧾 تصدير PDF</a>
-                    <a href="{% url 'inventory_app:export_products_excel' %}" class="btn btn--sm" style="background: #0ea5e9; color: white;">📥 تصدير Excel</a>
-                    <a href="{% url 'inventory_app:import_products_excel' %}" class="btn btn--sm" style="background: #22c55e; color: white;">📤 استيراد من Excel</a>
-                    <button class="btn btn--sm" onclick="resetAllQuantities()" style="background: #f59e0b; color: white;">↺ تصفير جميع الكميات</button>
-                    <a href="{% url 'inventory_app:container_list' %}" class="btn btn--sm" style="background: #6366f1; color: white;">📋 إدارة الحاويات</a>
-                    {% if selected_container %}
-                        <a href="{% url 'inventory_app:products_list' %}" class="btn btn--sm" style="background: #ef4444; color: white;">✕ إلغاء الفلترة</a>
-                    {% endif %}
+
+                <!-- Mobile View -->
+                <div class="mobile-only mobile-actions-bar">
+                    <div style="display: flex; gap: 5px;">
+                        <a href="{% url 'inventory_app:product_add' %}" class="btn btn--sm btn--primary">
+                            <span class="icon">➕</span> جديد
+                        </a>
+                        <button id="delete-mobile-btn" class="btn btn--sm btn--danger" onclick="deleteSelectedProducts()" style="display: none;">
+                            <span class="icon">🗑️</span>
+                        </button>
+                    </div>
+                    
+                    <div class="action-dropdown">
+                        <button class="btn btn--sm btn--secondary" onclick="toggleMobileActions(event)">
+                            الإجراءات ▾
+                        </button>
+                        <div id="mobile-actions-dropdown" class="action-dropdown-content">
+                             <a href="{% url 'inventory_app:export_products_pdf' %}" target="_blank">🧾 تصدير PDF</a>
+                            <a href="{% url 'inventory_app:export_products_excel' %}">📥 تصدير Excel</a>
+                            <a href="{% url 'inventory_app:import_products_excel' %}">📤 استيراد من Excel</a>
+                            <button onclick="resetAllQuantities()">↺ تصفير جميع الكميات</button>
+                            <a href="{% url 'inventory_app:container_list' %}">📋 إدارة الحاويات</a>
+                             {% if selected_container %}
+                                <a href="{% url 'inventory_app:products_list' %}" style="color: #ef4444;">✕ إلغاء الفلترة</a>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
             {% if products %}
@@ -427,17 +716,16 @@
                     <table>
                     <thead>
                         <tr>
-                            <th style="width: 50px;">
+                            <th>
                                 <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
                             </th>
                             <th>رقم المنتج</th>
                             <th>الاسم</th>
                             <th>الصورة</th>
-                            <th>الفئة</th>
+                            <th>السعر</th>
                             <th>الحاوية</th>
                             <th>الكمية (حبة)</th>
-                            <th>درزن/كرتون</th>
-                            <th>التفاصيل</th>
+
                             <th>الأماكن</th>
                             <th>الإجراءات</th>
                         </tr>
@@ -452,12 +740,18 @@
                                 <td>{{ product.name }}</td>
                                 <td>
                                     {% if product.image %}
-                                        <img src="{{ product.image.url }}" alt="{{ product.name }}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0;">
+                                        <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-thumbnail" onclick="openImageModal(this.src)" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0;">
                                     {% else %}
                                         <span style="color: #94a3b8; font-size: 0.85rem;">لا توجد صورة</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ product.category|default:"-" }}</td>
+                                <td>
+                                    {% if product.price %}
+                                        <strong style="color: #059669;">{{ product.price }} ريال</strong>
+                                    {% else %}
+                                        <span style="color: #94a3b8; font-size: 0.85rem;">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if product.container %}
                                         <span class="container-badge" data-color="{{ product.container.color }}">
@@ -468,39 +762,8 @@
                                     {% endif %}
                                 </td>
                                 <td><strong style="color: #059669;">{{ product.quantity }}</strong></td>
-                                <td>
-                                    <input type="number" 
-                                           value="{{ product.dozens_per_carton }}" 
-                                           min="1" 
-                                           style="width: 60px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;"
-                                           class="dozens-input" data-product-id="{{ product.id }}">
-                                </td>
-                                <td>
-                                    <div style="display: flex; flex-direction: column; gap: 5px;">
-                                        <div style="font-weight: 600; color: #059669; font-size: 0.95rem;">
-                                            {{ product.get_quantity_breakdown.formatted }}
-                                        </div>
-                                        <div style="font-size: 0.8rem; color: #64748b;">
-                                            {% with breakdown=product.get_quantity_breakdown %}
-                                                {% if breakdown.cartons > 0 %}
-                                                    <span style="background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 3px; margin: 2px;">
-                                                        📦 {{ breakdown.cartons }}
-                                                    </span>
-                                                {% endif %}
-                                                {% if breakdown.dozens > 0 %}
-                                                    <span style="background: #e0e7ff; color: #4338ca; padding: 2px 6px; border-radius: 3px; margin: 2px;">
-                                                        🎁 {{ breakdown.dozens }}
-                                                    </span>
-                                                {% endif %}
-                                                {% if breakdown.pieces > 0 %}
-                                                    <span style="background: #dcfce7; color: #065f46; padding: 2px 6px; border-radius: 3px; margin: 2px;">
-                                                        🔢 {{ breakdown.pieces }}
-                                                    </span>
-                                                {% endif %}
-                                            {% endwith %}
-                                        </div>
-                                    </div>
-                                </td>
+
+
                                 <td>
                                     {% if product.location %}
                                         <span style="background: #dcfce7; color: #065f46; padding: 3px 8px; border-radius: 4px; margin: 2px; display: inline-block; font-size: 0.85rem;">
@@ -511,11 +774,24 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <div class="row-actions">
+                                    <!-- Desktop Actions -->
+                                    <div class="row-actions desktop-only">
                                         <a href="/products/{{ product.id }}/" class="btn btn--xs btn--info"><span class="icon">👁️</span><span class="text">عرض</span></a>
                                         <a href="/products/{{ product.id }}/edit/" class="btn btn--xs btn--primary"><span class="icon">✏️</span><span class="text">تعديل</span></a>
                                         <a href="/products/{{ product.id }}/assign/" class="btn btn--xs btn--success"><span class="icon">📍</span><span class="text">ربط</span></a>
                                         <button class="btn btn--xs btn--danger delete-btn" data-product-id="{{ product.id }}" data-product-number="{{ product.product_number }}"><span class="icon">🗑️</span><span class="text">حذف</span></button>
+                                    </div>
+                                    
+                                    <!-- Mobile Kebab Menu -->
+                                    <div class="kebab-menu-container mobile-only">
+                                        <button class="kebab-btn" onclick="toggleRowMenu(event, 'row-menu-{{ product.id }}')">⋮</button>
+                                        <div id="row-menu-{{ product.id }}" class="kebab-dropdown">
+                                            <a href="/products/{{ product.id }}/">👁️ عرض</a>
+                                            <a href="/products/{{ product.id }}/edit/">✏️ تعديل</a>
+                                            <a href="/products/{{ product.id }}/assign/">📍 ربط</a>
+                                            <button class="delete-btn" data-product-id="{{ product.id }}" data-product-number="{{ product.product_number }}">🗑️ حذف</button>
+                                            <div class="kebab-close-btn" onclick="toggleRowMenu(event, 'row-menu-{{ product.id }}')">إلغاء</div>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -524,48 +800,9 @@
                     </table>
                 </div>
                 
-                <!-- أزرار التنقل بين الصفحات -->
-                {% if page_obj.has_other_pages %}
-                <div style="display: flex; justify-content: center; align-items: center; margin: 30px 0; gap: 10px;">
-                    {% if page_obj.has_previous %}
-                        <a href="?page=1{% if search %}&search={{ search }}{% endif %}" class="btn btn--sm" style="background: #6366f1; color: white;">
-                            ⏮️ الأولى
-                        </a>
-                        <a href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}" class="btn btn--sm" style="background: #3b82f6; color: white;">
-                            ← السابقة
-                        </a>
-                    {% endif %}
-                    
-                    <div style="background: white; padding: 10px 20px; border-radius: 8px; border: 2px solid #e5e7eb; font-weight: 600; color: #1f2937;">
-                        صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}
-                    </div>
-                    
-                    {% if page_obj.has_next %}
-                        <a href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}" class="btn btn--sm" style="background: #3b82f6; color: white;">
-                            التالية →
-                        </a>
-                        <a href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}" class="btn btn--sm" style="background: #6366f1; color: white;">
-                            الأخيرة ⏭️
-                        </a>
-                    {% endif %}
-                </div>
-                {% endif %}
                 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 20px; border-top: 2px solid var(--border-color); flex-wrap: wrap; gap: 15px;">
-                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                    <p style="color: var(--text-secondary); margin: 0;">
-                            عرض {{ page_obj.start_index }} - {{ page_obj.end_index }} من إجمالي {{ total_count }} منتج
-                        </p>
-                        {% if not show_all and total_count > 100 %}
-                            <a href="?show_all=true{% if search %}&search={{ search }}{% endif %}" class="btn btn--sm" style="background: #10b981; color: white;">
-                                📋 عرض جميع المنتجات ({{ total_count }})
-                            </a>
-                        {% elif show_all %}
-                            <a href="?{% if search %}search={{ search }}{% endif %}" class="btn btn--sm" style="background: #6366f1; color: white;">
-                                📄 عرض بالصفحات (100 لكل صفحة)
-                            </a>
-                        {% endif %}
-                    </div>
+                
+                <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 20px; padding-top: 20px; border-top: 2px solid var(--border-color); gap: 15px;">
                     <button onclick="deleteSelectedProducts()" class="btn btn--sm btn--danger" style="display: none;" id="delete-selected-btn-bottom">
                         <span class="icon">🗑️</span>
                         <span id="delete-selected-count-bottom">حذف المحدد (0)</span>
@@ -576,7 +813,7 @@
                     {% if search %}
                         لم يتم العثور على منتجات للبحث "{{ search }}"
                     {% else %}
-                        لا توجد منتجات حتى الآن. <a href="/admin/inventory_app/product/add/">أضف منتجاً جديداً</a>
+                        لا توجد منتجات حتى الآن. <a href="/products/add/">أضف منتجاً جديداً</a>
                     {% endif %}
                 </p>
             {% endif %}
@@ -887,12 +1124,14 @@
             const bottomText = document.getElementById('delete-selected-count-bottom');
             const fixedBtn = document.getElementById('delete-fixed-btn');
             const fixedText = document.getElementById('delete-fixed-count');
+            const mobileBtn = document.getElementById('delete-mobile-btn');
             
             if (count === 0) {
                 if (infoDiv) { infoDiv.textContent = 'لم يتم تحديد أي منتجات'; infoDiv.style.color = '#6b7280'; }
                 if (topBtn) topBtn.style.display = 'none';
                 if (bottomBtn) bottomBtn.style.display = 'none';
                 if (fixedBtn) fixedBtn.style.display = 'none';
+                if (mobileBtn) mobileBtn.style.display = 'none';
             } else {
                 if (infoDiv) { infoDiv.textContent = `تم تحديد ${count} منتج`; infoDiv.style.color = '#059669'; infoDiv.style.fontWeight = '600'; }
                 if (topBtn) topBtn.style.display = 'inline-flex';
@@ -901,8 +1140,36 @@
                 if (bottomText) bottomText.textContent = `حذف المحدد (${count})`;
                 if (fixedBtn) fixedBtn.style.display = 'inline-flex';
                 if (fixedText) fixedText.textContent = `حذف المحدد (${count})`;
+                if (mobileBtn) mobileBtn.style.display = 'inline-flex';
             }
         }
+
+        // Mobile Menu Toggles
+        function toggleMobileActions(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('mobile-actions-dropdown');
+            dropdown.classList.toggle('show');
+            // Close row menus
+            document.querySelectorAll('.kebab-dropdown').forEach(d => d.classList.remove('show'));
+        }
+
+        function toggleRowMenu(event, menuId) {
+            event.stopPropagation();
+            // Close other menus
+            document.querySelectorAll('.kebab-dropdown').forEach(d => {
+                if(d.id !== menuId) d.classList.remove('show');
+            });
+            document.getElementById('mobile-actions-dropdown')?.classList.remove('show');
+            
+            const menu = document.getElementById(menuId);
+            menu.classList.toggle('show');
+        }
+
+        // Close menus when clicking outside
+        document.addEventListener('click', function() {
+            document.getElementById('mobile-actions-dropdown')?.classList.remove('show');
+            document.querySelectorAll('.kebab-dropdown').forEach(d => d.classList.remove('show'));
+        });
         
         // مراقبة تغييرات Checkboxes
         document.addEventListener('DOMContentLoaded', function() {
@@ -1046,6 +1313,33 @@
             });
         }
     </script>
-</body>
-</html>
+    <!-- نافذة عرض الصورة المكبرة -->
+    <div id="imageModal" class="image-modal" onclick="closeImageModal()">
+        <img class="image-modal-content" id="modalImage" onclick="event.stopPropagation()">
+    </div>
 
+    <script>
+        function openImageModal(src) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.style.display = 'flex';
+            modalImg.src = src;
+            document.body.style.overflow = 'hidden'; // منع التمرير في الخلفية
+        }
+        
+        function closeImageModal() {
+            const modal = document.getElementById('imageModal');
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto'; // إعادة التمرير
+        }
+        
+        // إغلاق النافذة عند الضغط على زر ESC
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                closeImageModal();
+            }
+        });
+    </script>
+</body>
+
+</html>

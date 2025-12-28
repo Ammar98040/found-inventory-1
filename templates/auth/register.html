@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>إنشاء حساب موظف - قلب العرب</title>
+    {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <style>
         * {
             margin: 0;
@@ -21,7 +23,152 @@
             padding: 20px;
         }
         
+        /* خلفية متحركة */
+        .background-animation {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        .floating-shape {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.1;
+            animation: float 20s infinite;
+        }
+        
+        .shape-1 {
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, #fff 0%, transparent 70%);
+            top: 10%;
+            left: 10%;
+            animation-delay: 0s;
+        }
+        
+        .shape-2 {
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, #fff 0%, transparent 70%);
+            top: 60%;
+            right: 15%;
+            animation-delay: 5s;
+        }
+        
+        .shape-3 {
+            width: 250px;
+            height: 250px;
+            background: radial-gradient(circle, #fff 0%, transparent 70%);
+            bottom: 15%;
+            left: 20%;
+            animation-delay: 10s;
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+            25% {
+                transform: translate(30px, -30px) rotate(90deg);
+            }
+            50% {
+                transform: translate(-20px, 20px) rotate(180deg);
+            }
+            75% {
+                transform: translate(20px, 30px) rotate(270deg);
+            }
+        }
+        
+        /* قلب متحرك */
+        .heart-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            animation: heartBeat 2s infinite;
+        }
+        
+        .heart {
+            width: 80px;
+            height: 80px;
+            position: relative;
+            transform: rotate(-45deg);
+            animation: pulse 2s infinite;
+        }
+        
+        .heart:before,
+        .heart:after {
+            content: "";
+            width: 80px;
+            height: 80px;
+            position: absolute;
+            left: 40px;
+            top: 0;
+            background: #fff;
+            border-radius: 50px 50px 0 0;
+            transform: rotate(-45deg);
+            transform-origin: 0 100%;
+        }
+        
+        .heart:after {
+            left: 0;
+            transform: rotate(45deg);
+            transform-origin: 100% 100%;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: rotate(-45deg) scale(1);
+            }
+            50% {
+                transform: rotate(-45deg) scale(1.2);
+            }
+        }
+        
+        @keyframes heartBeat {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+            25% {
+                transform: translate(-50%, -50%) scale(1.1);
+            }
+            75% {
+                transform: translate(-50%, -50%) scale(0.9);
+            }
+        }
+        
+        /* نجوم متحركة */
+        .stars {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+        }
+        
+        .star {
+            position: absolute;
+            color: white;
+            font-size: 20px;
+            animation: twinkle 3s infinite;
+        }
+        
+        @keyframes twinkle {
+            0%, 100% {
+                opacity: 0.3;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.5);
+            }
+        }
+
         .register-container {
+            position: relative;
+            z-index: 10;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             padding: 40px;
@@ -58,6 +205,7 @@
             font-weight: bold;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 5px;
         }
@@ -152,9 +300,30 @@
     </style>
 </head>
 <body>
+    <!-- خلفية متحركة -->
+    <div class="background-animation">
+        <div class="floating-shape shape-1"></div>
+        <div class="floating-shape shape-2"></div>
+        <div class="floating-shape shape-3"></div>
+    </div>
+    
+    <!-- نجوم متحركة -->
+    <div class="stars">
+        <div class="star" style="top: 10%; left: 10%;">⭐</div>
+        <div class="star" style="top: 20%; left: 80%; animation-delay: 0.5s;">⭐</div>
+        <div class="star" style="top: 80%; left: 20%; animation-delay: 1s;">⭐</div>
+        <div class="star" style="top: 50%; left: 70%; animation-delay: 1.5s;">⭐</div>
+        <div class="star" style="top: 70%; left: 50%; animation-delay: 2s;">⭐</div>
+    </div>
+    
+    <!-- قلب متحرك في الخلفية -->
+    <div class="heart-container">
+        <div class="heart"></div>
+    </div>
+    
     <div class="register-container">
         <div class="logo-container">
-            <div class="logo-icon">👤</div>
+            <img src="{% static 'img/favicon.svg' %}" alt="شعار قلب العرب" class="logo-icon" style="width: 80px; height: 80px;">
             <div class="logo-text">إنشاء حساب موظف</div>
             <div class="logo-subtitle">قلب العرب - نظام إدارة المخزون</div>
         </div>
@@ -206,6 +375,25 @@
             </a>
         </form>
     </div>
+    
+    <script>
+        // إضافة نجمة جديدة بشكل عشوائي
+        setInterval(() => {
+            const stars = document.querySelector('.stars');
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.top = Math.random() * 100 + '%';
+            star.style.left = Math.random() * 100 + '%';
+            star.style.animationDelay = Math.random() * 3 + 's';
+            star.textContent = '⭐';
+            stars.appendChild(star);
+            
+            // إزالة النجمة بعد 3 ثواني
+            setTimeout(() => {
+                star.remove();
+            }, 3000);
+        }, 2000);
+    </script>
 </body>
 </html>
 

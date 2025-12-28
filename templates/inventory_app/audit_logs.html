@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>سجلات العمليات</title>
     {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
     <link rel="stylesheet" href="{% static 'css/product_buttons.css' %}">
-    <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+
     <style>
         .operation-section {
             background: white;
@@ -409,13 +410,19 @@
                             <div><strong>الموقع:</strong> {{ log.product_snapshot.location|default:"-" }}</div>
                             <div><strong>الباركود:</strong> {{ log.product_snapshot.barcode|default:"-" }}</div>
                             <div><strong>السعر:</strong> {% if log.product_snapshot.price %}{{ log.product_snapshot.price }}{% else %}-{% endif %}</div>
-                            <div><strong>عدد الكراتين:</strong> {{ log.product_snapshot.carton_count|default:0 }}</div>
-                            <div><strong>عدد الحبات/كرتون:</strong> {{ log.product_snapshot.qty_per_carton|default:0 }}</div>
                             <div style="grid-column: 1 / -1"><strong>الوصف:</strong> {{ log.product_snapshot.description|default:"" }}</div>
                             {% if log.product_snapshot.image_url %}
                                 <div style="grid-column: 1 / -1; margin-top: 10px;">
                                     <a href="{{ log.product_snapshot.image_url }}" target="_blank" style="color: #2563eb;">رابط الصورة</a>
                                 </div>
+                            {% endif %}
+                            
+                            {% if request.user.user_profile.is_admin %}
+                            <div style="grid-column: 1 / -1; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                                <a href="{% url 'inventory_app:restore_product' log.id %}" class="btn btn--sm btn--primary" onclick="return confirm('هل أنت متأكد من استعادة هذا المنتج؟')" style="background-color: #10b981; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                                    ♻️ استعادة المنتج
+                                </a>
+                            </div>
                             {% endif %}
                         </div>
                     </div>
@@ -585,7 +592,7 @@
         </div>
     </div>
     
-    <script src="{% static 'js/notifications.js' %}"></script>
+
     <script src="{% static 'js/sidebar.js' %}"></script>
     <script src="{% static 'js/auto_refresh.js' %}"></script>
     <script>

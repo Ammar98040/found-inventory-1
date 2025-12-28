@@ -3,28 +3,235 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سجل الطلبات المسحوبة - نظام إدارة المستودع</title>
+    <title>سجل الطلبات والتحليلات - نظام إدارة المستودع</title>
     {% load static %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
-        .orders-container {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: var(--shadow-lg);
+        :root {
+            --primary-color: #4f46e5;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
         }
-        
+
+        body {
+            background-color: var(--bg-color);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
         .page-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 30px;
-            flex-wrap: wrap;
-            gap: 15px;
+            background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+            padding: 25px;
+            border-radius: 16px;
+            color: white;
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.5);
         }
-        
+
+        .page-header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .btn-white {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(5px);
+            transition: all 0.3s;
+        }
+
+        .btn-white:hover {
+            background: white;
+            color: var(--primary-color);
+        }
+
+        /* Dashboard Charts */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+            max-height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .chart-container {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .scrollable-list-container {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #f1f5f9;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .recipient-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .recipient-row:hover {
+            background-color: #f8fafc;
+        }
+
+        .recipient-name {
+            font-weight: 500;
+            color: #334155;
+        }
+
+        .recipient-count {
+            background: #eff6ff;
+            color: #3b82f6;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        /* Smart Search */
+        .search-section {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 15px 20px 15px 50px;
+            font-size: 1.1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2rem;
+            color: #94a3b8;
+        }
+
+        .insight-card {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 12px;
+            padding: 20px;
+            display: none; /* Hidden by default */
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .insight-card.active {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .insight-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #bae6fd;
+            padding-bottom: 10px;
+        }
+
+        .insight-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .stat-label {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #0f172a;
+        }
+
+        .recipients-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .recipients-list li {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.9rem;
+        }
+
+        /* Orders Grid */
         .orders-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -33,7 +240,7 @@
         
         .order-card {
             background: white;
-            border: 2px solid #e2e8f0;
+            border: 1px solid #e2e8f0;
             border-radius: 12px;
             padding: 20px;
             transition: all 0.3s;
@@ -41,15 +248,15 @@
         }
         
         .order-card:hover {
-            border-color: #667eea;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
+            border-color: var(--primary-color);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
         
         .order-number {
             font-size: 1.2rem;
             font-weight: bold;
-            color: #667eea;
+            color: var(--primary-color);
             margin-bottom: 10px;
             font-family: monospace;
         }
@@ -65,26 +272,15 @@
             border-bottom: 1px solid #f1f5f9;
         }
         
-        .order-detail-item:last-child {
-            border-bottom: none;
-        }
-        
-        .detail-label {
-            color: #64748b;
-            font-size: 0.9rem;
-        }
-        
-        .detail-value {
-            font-weight: bold;
-            color: #1e293b;
-        }
+        .detail-label { color: #64748b; font-size: 0.9rem; }
+        .detail-value { font-weight: bold; color: #1e293b; }
         
         .order-actions {
             display: flex;
             gap: 10px;
             margin-top: 15px;
             padding-top: 15px;
-            border-top: 2px solid #f1f5f9;
+            border-top: 1px solid #f1f5f9;
         }
         
         .order-date {
@@ -94,15 +290,28 @@
             font-size: 0.8rem;
             color: #64748b;
             background: #f1f5f9;
-            padding: 5px 10px;
+            padding: 4px 10px;
             border-radius: 20px;
         }
         
         .btn-sm {
             padding: 8px 16px;
             font-size: 0.9rem;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            border: none;
+            transition: opacity 0.2s;
         }
         
+        .btn-sm:hover { opacity: 0.9; }
+
+        .btn-primary { background-color: var(--primary-color); color: white; text-decoration: none; }
+        .btn-danger { background-color: #ef4444; color: white; text-decoration: none; }
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -113,38 +322,169 @@
             font-size: 4rem;
             margin-bottom: 20px;
         }
-        
+
         @media (max-width: 768px) {
-            .orders-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .page-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .page-header { flex-direction: column; align-items: flex-start; }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <div class="page-header">
-            <h1>📋 سجل الطلبات المسحوبة</h1>
             <div>
-                <a href="/" class="btn btn-primary">
-                    <span class="btn-icon">🏠</span>
-                    الرئيسية
+                <h1>📊 سجل الطلبات والتحليلات</h1>
+                <p style="margin: 5px 0 0 0; opacity: 0.9;">متابعة حركة المخزون وتحليل الاستهلاك</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="/analytics/" class="btn btn-primary" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border: none;">
+                    🚀 التحليلات الذكية المتقدمة
+                </a>
+                <a href="/" class="btn btn-white">
+                    🏠 الرئيسية
                 </a>
             </div>
         </div>
         
+        <!-- Analytics Dashboard -->
+        <div class="dashboard-grid">
+            <div class="chart-card">
+                <h3>📈 حركة السحب (آخر 30 يوم)</h3>
+                <canvas id="dailyChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">🏆 أكثر المستلمين طلباً</h3>
+                    <button id="showAllRecipientsBtn" class="btn btn-sm btn-primary" style="padding: 4px 12px; font-size: 0.8rem;">
+                        عرض الكل
+                    </button>
+                </div>
+                <canvas id="recipientChart"></canvas>
+            </div>
+        </div>
+
+        <!-- All Recipients Modal -->
+        <div id="allRecipientsModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+            <div style="background: white; width: 90%; max-width: 600px; max-height: 80vh; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
+                <div style="padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; color: #1e293b;">📋 قائمة جميع المستلمين</h3>
+                    <button onclick="document.getElementById('allRecipientsModal').style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
+                </div>
+                <div style="overflow-y: auto; padding: 20px;">
+                    <div style="margin-bottom: 15px;">
+                        <input type="text" id="recipientSearchInput" placeholder="بحث عن اسم..." style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f8fafc; text-align: right;">
+                                <th style="padding: 12px; color: #475569; font-weight: 600;">الاسم</th>
+                                <th style="padding: 12px; color: #475569; font-weight: 600;">عدد الطلبات</th>
+                                <th style="padding: 12px; color: #475569; font-weight: 600;">إجمالي الكميات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allRecipientsTableBody">
+                            <!-- Dynamic Content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Smart Search -->
+        <div class="search-section">
+            <div class="search-input-wrapper">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="historySearch" class="search-input" placeholder="بحث ذكي: اكتب اسم المنتج أو رقمه لمعرفة من سحبه وكم الكمية...">
+            </div>
+            
+            <div id="insightCard" class="insight-card">
+                <div class="insight-header">
+                    <h3 style="margin:0; color:#0369a1;">نتائج تحليل المنتج: <span id="searchQueryVal"></span></h3>
+                </div>
+                <div class="insight-stats">
+                    <div class="stat-box">
+                        <div class="stat-label">إجمالي الكميات المسحوبة</div>
+                        <div class="stat-value" id="totalWithdrawnVal">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">المستلمين والكميات (اضغط للفلترة)</div>
+                        <ul class="recipients-list" id="recipientsList">
+                            <!-- Dynamic -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Orders List -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; color: #334155;">
+                📝 سجل الطلبات 
+                {% if request.GET.recipient %}
+                - الخاص بـ: <span style="color: var(--primary-color);">{{ request.GET.recipient }}</span>
+                {% endif %}
+                {% if request.GET.product_query %}
+                <span style="font-size: 0.8em; color: #64748b;">(فلترة بالمنتج: {{ request.GET.product_query }})</span>
+                {% endif %}
+                {% if not request.GET.recipient %}
+                الأخير
+                {% endif %}
+            </h3>
+            
+            {% if request.GET.recipient %}
+            <a href="?" class="btn btn-sm btn-danger" style="background-color: #ef4444;">
+                ❌ إلغاء الفلترة
+            </a>
+            {% endif %}
+        </div>
         <div class="orders-container">
+            {% if recipient_items %}
+                <!-- عرض سجل المواد التفصيلي للمستلم -->
+                <div class="recipient-log-table" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 30px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #f1f5f9; padding-bottom: 15px;">
+                        <h3 style="margin: 0; color: #1e293b; display: flex; align-items: center; gap: 10px;">
+                            📋 سجل المواد المسحوبة
+                            <span style="font-size: 0.9rem; background: #e0f2fe; color: #0369a1; padding: 4px 12px; border-radius: 20px;">
+                                {{ recipient_items|length }} مادة
+                            </span>
+                        </h3>
+                    </div>
+                    
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                            <thead>
+                                <tr style="background: #f8fafc;">
+                                    <th style="padding: 15px; text-align: right; color: #475569; font-weight: 600; border-radius: 0 8px 8px 0;">رقم المنتج</th>
+                                    <th style="padding: 15px; text-align: right; color: #475569; font-weight: 600;">الكمية</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in recipient_items %}
+                                <tr style="transition: background-color 0.2s; border-bottom: 1px solid #f1f5f9; cursor: pointer;" 
+                                    onclick="window.location.href='/orders/{{ item.order_id }}/{% if request.GET.product_query %}?product_query={{ request.GET.product_query }}{% endif %}'">
+                                    <td style="padding: 12px 15px; border-bottom: 1px solid #f1f5f9; font-family: monospace; font-size: 1.1em; color: #334155;">
+                                        <strong>{{ item.product_number }}</strong>
+                                    </td>
+                                    <td style="padding: 12px 15px; border-bottom: 1px solid #f1f5f9;">
+                                        <span style="background: #ecfdf5; color: #059669; padding: 4px 12px; border-radius: 6px; font-weight: bold;">
+                                            {{ item.quantity }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
             {% if orders %}
                 <div class="orders-grid">
                     {% for order in orders %}
                         <div class="order-card">
                             <div class="order-date">{{ order.created_at|date:"Y-m-d H:i" }}</div>
-                            <div class="order-number">#{{ forloop.counter }}{% if order.recipient_name %} - {{ order.recipient_name }}{% endif %}</div>
+                            <div class="order-number">#{{ order.order_number }}{% if order.recipient_name %} - {{ order.recipient_name }}{% endif %}</div>
                             
                             <div class="order-details">
                                 <div class="order-detail-item">
@@ -158,18 +498,34 @@
                             </div>
                             
                             <div class="order-actions">
-                                <a href="/orders/{{ order.id }}/" class="btn btn-primary btn-sm" style="flex: 1;">
-                                    <span class="btn-icon">👁️</span>
-                                    التفاصيل
+                                <a href="/orders/{{ order.id }}/" class="btn btn-sm btn-primary" style="flex: 1; justify-content: center;">
+                                    👁️ التفاصيل
                                 </a>
-                                <button class="btn btn-sm delete-order-btn" data-id="{{ order.id }}" data-number="{{ order.order_number }}" style="background: #ef4444; color: white; flex: 1;">
-                                    <span class="btn-icon">🗑️</span>
-                                    حذف
+                                <button class="btn btn-sm btn-danger delete-order-btn" data-id="{{ order.id }}" data-number="{{ order.order_number }}" style="flex: 1; justify-content: center;">
+                                    🗑️ حذف
                                 </button>
                             </div>
                         </div>
                     {% endfor %}
                 </div>
+                
+                <!-- Pagination -->
+                {% if page_obj.has_other_pages %}
+                <div style="margin-top: 30px; display: flex; justify-content: center; gap: 10px;">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-sm btn-primary">السابق</a>
+                    {% endif %}
+                    
+                    <span style="padding: 8px 15px; background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}
+                    </span>
+                    
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}" class="btn btn-sm btn-primary">التالي</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
             {% else %}
                 <div class="empty-state">
                     <div class="empty-state-icon">📭</div>
@@ -184,6 +540,217 @@
     </div>
     
     <script>
+        // --- 1. Charts Configuration ---
+        document.addEventListener('DOMContentLoaded', function() {
+            // Data passed from Django View
+            const dailyLabels = JSON.parse('{{ daily_labels|safe }}');
+            const dailyCounts = JSON.parse('{{ daily_counts|safe }}');
+            const dailyQtys = JSON.parse('{{ daily_qtys|safe }}');
+            
+            const recipientLabels = JSON.parse('{{ recipient_labels|safe }}');
+            const recipientCounts = JSON.parse('{{ recipient_counts|safe }}');
+
+            // Daily Orders Chart
+            const ctxDaily = document.getElementById('dailyChart').getContext('2d');
+            new Chart(ctxDaily, {
+                type: 'line',
+                data: {
+                    labels: dailyLabels,
+                    datasets: [
+                        {
+                            label: 'عدد الطلبات',
+                            data: dailyCounts,
+                            borderColor: '#4f46e5',
+                            backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'الكميات المسحوبة',
+                            data: dailyQtys,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.0)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'عدد الطلبات'} },
+                        y1: { type: 'linear', display: true, position: 'left', grid: {drawOnChartArea: false}, title: {display: true, text: 'الكميات'} }
+                    }
+                }
+            });
+
+            // Recipients Chart
+            const ctxRec = document.getElementById('recipientChart').getContext('2d');
+            new Chart(ctxRec, {
+                type: 'bar',
+                data: {
+                    labels: recipientLabels,
+                    datasets: [{
+                        label: 'عدد الطلبات',
+                        data: recipientCounts,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        });
+
+        // --- 1.5 Show All Recipients Logic ---
+        const modal = document.getElementById('allRecipientsModal');
+        const showAllBtn = document.getElementById('showAllRecipientsBtn');
+        const tableBody = document.getElementById('allRecipientsTableBody');
+        const searchInputRec = document.getElementById('recipientSearchInput');
+        let allRecipientsData = [];
+
+        showAllBtn.addEventListener('click', async () => {
+            modal.style.display = 'flex';
+            
+            // Fetch if not already fetched
+            if (allRecipientsData.length === 0) {
+                try {
+                    tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 20px;">جاري التحميل...</td></tr>';
+                    const res = await fetch('/api/recipients-stats/');
+                    const data = await res.json();
+                    
+                    if (data.success) {
+                        allRecipientsData = data.recipients;
+                        renderRecipientsTable(allRecipientsData);
+                    } else {
+                        tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color: red;">فشل تحميل البيانات</td></tr>';
+                    }
+                } catch (e) {
+                    console.error(e);
+                    tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color: red;">حدث خطأ في الاتصال</td></tr>';
+                }
+            }
+        });
+
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.style.display = 'none';
+        });
+
+        // Filter functionality
+        searchInputRec.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const filtered = allRecipientsData.filter(r => r.recipient_name.toLowerCase().includes(term));
+            renderRecipientsTable(filtered);
+        });
+
+        function renderRecipientsTable(data) {
+            if (data.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 20px;">لا توجد نتائج</td></tr>';
+                return;
+            }
+            
+            tableBody.innerHTML = data.map(r => `
+                <tr style="border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.2s;" 
+                    onclick="window.location.href='?recipient=${encodeURIComponent(r.recipient_name)}'"
+                    onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                    <td style="padding: 12px; color: #334155;">${r.recipient_name}</td>
+                    <td style="padding: 12px;">
+                        <span style="background: #eff6ff; color: #3b82f6; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.9em;">
+                            ${r.count}
+                        </span>
+                    </td>
+                    <td style="padding: 12px; color: #64748b;">${r.total_qty || 0}</td>
+                </tr>
+            `).join('');
+        }
+
+        // --- 2. Smart Search Logic ---
+        const searchInput = document.getElementById('historySearch');
+        const insightCard = document.getElementById('insightCard');
+        let debounceTimer;
+
+        searchInput.addEventListener('input', function(e) {
+            const query = e.target.value.trim();
+            
+            clearTimeout(debounceTimer);
+            if (query.length < 2) {
+                insightCard.classList.remove('active');
+                return;
+            }
+
+            debounceTimer = setTimeout(() => {
+                fetchOrderHistory(query);
+            }, 600);
+        });
+
+        async function fetchOrderHistory(query) {
+            try {
+                const res = await fetch(`/api/search-order-history/?q=${encodeURIComponent(query)}`);
+                
+                // التحقق من أن الاستجابة هي JSON (لتفادي مشكلة انتهاء الجلسة)
+                const contentType = res.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    console.warn("استجابة غير صالحة، قد تكون الجلسة انتهت.");
+                    // يمكننا تنبيه المستخدم أو تحديث الصفحة
+                    return;
+                }
+
+                const data = await res.json();
+                
+                if (data.success && (data.stats.total_withdrawn > 0 || data.stats.top_recipients.length > 0)) {
+                    // Update UI
+                    document.getElementById('searchQueryVal').textContent = query;
+                    document.getElementById('totalWithdrawnVal').textContent = data.stats.total_withdrawn;
+                    
+                    const list = document.getElementById('recipientsList');
+                    list.innerHTML = '';
+                    data.stats.top_recipients.forEach(r => {
+                        const li = document.createElement('li');
+                        li.style.cursor = 'pointer';
+                        li.style.transition = 'background-color 0.2s';
+                        li.title = 'اضغط لعرض سجل هذا المستلم';
+                        
+                        // إضافة حدث النقر للتوجيه
+                        li.onclick = function() {
+                            // إذا كان هناك نص بحث، نمرره في الرابط لتصفية المنتجات أيضاً
+                            const searchParam = query ? `&product_query=${encodeURIComponent(query)}` : '';
+                            window.location.href = `?recipient=${encodeURIComponent(r.name)}${searchParam}`;
+                        };
+                        
+                        // تأثير التمرير
+                        li.onmouseover = function() { this.style.backgroundColor = '#e0f2fe'; };
+                        li.onmouseout = function() { this.style.backgroundColor = 'transparent'; };
+
+                        li.innerHTML = `<span>${r.name}</span> <strong>${r.count} قطعة</strong>`;
+                        list.appendChild(li);
+                    });
+                    
+                    insightCard.classList.add('active');
+                } else {
+                    insightCard.classList.remove('active');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // --- 3. Delete Order Logic ---
         async function deleteOrder(orderId, orderNumber) {
             if (!confirm(`هل أنت متأكد من حذف الطلبية ${orderNumber}؟`)) {
                 return;
@@ -192,9 +759,7 @@
             try {
                 const response = await fetch(`/api/delete-order/${orderId}/`, {
                     method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
+                    headers: { 'Content-Type': 'application/json' }
                 });
                 
                 const data = await response.json();
@@ -209,13 +774,12 @@
                 alert('✗ خطأ: ' + error.message);
             }
         }
-        document.addEventListener('DOMContentLoaded', function(){
-            document.querySelectorAll('.delete-order-btn').forEach(function(btn){
-                btn.addEventListener('click', function(){
-                    var id = this.getAttribute('data-id');
-                    var num = this.getAttribute('data-number');
-                    deleteOrder(id, num);
-                });
+
+        document.querySelectorAll('.delete-order-btn').forEach(function(btn){
+            btn.addEventListener('click', function(){
+                var id = this.getAttribute('data-id');
+                var num = this.getAttribute('data-number');
+                deleteOrder(id, num);
             });
         });
     </script>

@@ -34,8 +34,13 @@ class ErrorHandlingMiddleware:
                 'error': 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى أو التواصل مع المسؤول.'
             }, status=500)
         
-        # في وضع التطوير، أظهر تفاصيل الخطأ
+        # في وضع التطوير، أظهر تفاصيل الخطأ ما لم يكن مسار API
         if settings.DEBUG:
+            if request.path.startswith('/api/') or request.headers.get('Accept','').find('application/json') != -1:
+                return JsonResponse({
+                    'success': False,
+                    'error': str(exception)
+                }, status=500)
             return None  # دع Django يعرض صفحة الخطأ الافتراضية
         
         # في الإنتاج، أظهر صفحة خطأ مخصصة
@@ -105,4 +110,3 @@ class SecurityHeadersMiddleware:
             )
         
         return response
-
