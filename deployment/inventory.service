@@ -1,0 +1,18 @@
+[Unit]
+Description=Gunicorn instance to serve Inventory App
+After=network.target
+
+[Service]
+# عدل المسار حسب مكان وضع المشروع
+User=root
+Group=www-data
+WorkingDirectory=/root/found-inventory/found-inventory-1
+Environment="PATH=/root/found-inventory/venv/bin"
+ExecStart=/root/found-inventory/venv/bin/gunicorn \
+          --access-logfile - \
+          --workers 3 \
+          --bind unix:/run/gunicorn.sock \
+          inventory_project.wsgi:application
+
+[Install]
+WantedBy=multi-user.target

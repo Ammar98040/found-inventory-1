@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db import transaction
 from django.db import models as db_models
-from .models import Product, Location, Warehouse, AuditLog, Order, ProductReturn, UserProfile, UserActivityLog, Container, AIInsightLog
+from .models import Product, Location, Warehouse, AuditLog, Order, ProductReturn, UserProfile, UserActivityLog, Container, SecureBackup
 from .decorators import admin_required, staff_required, exclude_maintenance, exclude_admin_dashboard, get_user_type, is_admin
 from .forms import LoginForm, RegisterStaffForm, ProductForm, EditStaffForm
 import json
@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 from django.views.decorators.cache import never_cache, cache_page
 from django.core.cache import cache
+from django.core.paginator import Paginator
 from django.conf import settings
 from django.utils.deprecation import MiddlewareMixin
 
@@ -485,6 +486,147 @@ def revert_compaction(request):
         return JsonResponse({'success': False, 'error': f'حدث خطأ أثناء التراجع: {str(e)}'})
 
 
+@admin_required
+def secure_backup_login(request):
+    """تسجيل الدخول للصندوق الأسود"""
+    if request.method == 'POST':
+        password = request.POST.get('password')
+        # كلمة مرور خاصة للصندوق الأسود
+        if password == 'secure999':
+            request.session['secure_backup_access'] = True
+            return redirect('inventory_app:secure_backup_dashboard')
+        else:
+            return render(request, 'inventory_app/secure_backup_login.html', {'error': 'كلمة المرور غير صحيحة'})
+    
+    return render(request, 'inventory_app/secure_backup_login.html')
+
+
+@admin_required
+def secure_backup_dashboard(request):
+    """لوحة تحكم السجل الآمن (الصندوق الأسود)"""
+    # التحقق من صلاحية الوصول
+    if not request.session.get('secure_backup_access'):
+        return redirect('inventory_app:secure_backup_login')
+
+    # Filters
+    q = request.GET.get('q', '')
+    table = request.GET.get('table', '')
+    action = request.GET.get('action', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    queryset = SecureBackup.objects.all().order_by('-timestamp')
+
+    if q:
+        queryset = queryset.filter(db_models.Q(id__icontains=q) | db_models.Q(hash_signature__icontains=q))
+    if table:
+        queryset = queryset.filter(table_name=table)
+    if action:
+        queryset = queryset.filter(action=action)
+    if date_from:
+        queryset = queryset.filter(timestamp__date__gte=date_from)
+    if date_to:
+        queryset = queryset.filter(timestamp__date__lte=date_to)
+
+    # Stats
+    stats = {
+        'total': SecureBackup.objects.count(),
+        'today': SecureBackup.objects.filter(timestamp__date=timezone.now().date()).count(),
+        'deleted_items': SecureBackup.objects.filter(action='delete').count()
+    }
+
+    # Pagination
+    paginator = Paginator(queryset, 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    tables = SecureBackup.objects.values_list('table_name', flat=True).distinct()
+
+    context = {
+        'backups': page_obj,
+        'stats': stats,
+        'tables': tables,
+        'current_filters': {
+            'q': q, 'table': table, 'action': action,
+            'date_from': date_from, 'date_to': date_to
+        }
+    }
+    return render(request, 'inventory_app/secure_backup.html', context)
+
+
+@admin_required
+def get_secure_backup_detail(request, backup_id):
+    # التحقق من صلاحية الوصول
+    if not request.session.get('secure_backup_access'):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    backup = get_object_or_404(SecureBackup, id=backup_id)
+    return JsonResponse({
+        'id': backup.id,
+        'table': backup.table_name,
+        'record_id': backup.record_id,
+        'action': backup.get_action_display(),
+        'timestamp': backup.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+        'data': backup.backup_data,
+        'hash': backup.hash_signature
+    })
+
+
+@admin_required
+def data_quality(request):
+    """صفحة فحص جودة البيانات"""
+    # 1. المنتجات بدون موقع
+    products_no_location = Product.objects.filter(location__isnull=True).order_by('product_number')
+    
+    # 2. المنتجات أقل من 12 حبة
+    products_low_qty = Product.objects.filter(quantity__lt=12).order_by('product_number')
+    
+    # 3. المنتجات بدون صور
+    products_no_image = Product.objects.filter(db_models.Q(image__exact='') | db_models.Q(image__isnull=True)).order_by('product_number')
+    
+    # 4. الحاويات الفارغة
+    empty_containers = Container.objects.annotate(prod_count=db_models.Count('product')).filter(prod_count=0)
+    
+    context = {
+        'products_no_location': products_no_location,
+        'products_low_qty': products_low_qty,
+        'products_no_image': products_no_image,
+        'empty_containers': empty_containers,
+    }
+    return render(request, 'inventory_app/data_quality.html', context)
+
+
+@admin_required
+def inventory_insights(request):
+    """صفحة توصيات المخزون"""
+    try:
+        # تحديد حد انخفاض المخزون (تم التعديل إلى 24)
+        low_stock_limit = 24
+        
+        # المنتجات منخفضة المخزون بشكل عام (أقل من أو يساوي الحد المحدد)
+        general_low_stock = Product.objects.filter(quantity__lte=low_stock_limit).order_by('quantity')
+        
+        counts = {
+            'low_general': general_low_stock.count()
+        }
+        
+        policy = {
+            'low_stock_limit': low_stock_limit
+        }
+
+        context = {
+            'general_low_stock': general_low_stock,
+            'counts': counts,
+            'policy': policy
+        }
+        return render(request, 'inventory_app/inventory_insights.html', context)
+    except Exception as e:
+        import traceback
+        print(f"Error in inventory_insights: {e}")
+        traceback.print_exc()
+        return JsonResponse({'error': str(e), 'trace': traceback.format_exc()}, status=500)
+
+
 @require_http_methods(["GET"])
 def get_warehouse_grid(request):
     """الحصول على شبكة المستودع"""
@@ -692,7 +834,7 @@ def warehouse_dashboard(request):
     )['total'] or 0
     
     # التقارير الذكية الأخيرة
-    latest_ai_reports = AIInsightLog.objects.all()[:5]
+    latest_ai_reports = []  # AIInsightLog.objects.all()[:5]
     
     return render(request, 'inventory_app/dashboard.html', {
         'warehouse': warehouse,
@@ -1763,22 +1905,7 @@ def data_quality_report(request):
         }
     })
 
-def inventory_insights(request):
-    # تم إزالة منطق الحسابات الأخرى بناءً على طلب المستخدم
-    low_stock_limit = 24
 
-    # المنتجات المنخفضة (أقل من 24)
-    general_low_stock = Product.objects.filter(quantity__lt=low_stock_limit, quantity__gt=0).order_by('quantity')
-
-    return render(request, 'inventory_app/inventory_insights.html', {
-        'general_low_stock': general_low_stock,
-        'policy': {
-            'low_stock_limit': low_stock_limit,
-        },
-        'counts': {
-            'low_general': general_low_stock.count(),
-        }
-    })
 
 @require_http_methods(["GET"])
 def low_stock_products_api(request):
@@ -3122,241 +3249,8 @@ def delete_order(request, order_id):
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 
-@login_required
-def analytics_dashboard(request):
-    """عرض صفحة التحليلات الذكية"""
-    return render(request, 'inventory_app/analytics_dashboard.html')
 
-@login_required
-def get_analytics_data(request):
-    """API لجلب بيانات التحليلات المتقدمة"""
-    days = int(request.GET.get('days', 30))
-    end_date = timezone.now()
-    start_date = end_date - timedelta(days=days)
-    
-    # 1. Base Query
-    orders = Order.objects.filter(created_at__gte=start_date).order_by('created_at')
-    
-    # 2. KPIs Logic
-    total_orders = orders.count()
-    total_items = orders.aggregate(total=db_models.Sum('total_quantities'))['total'] or 0
-    
-    # Trend (Previous Period Comparison)
-    prev_start = start_date - timedelta(days=days)
-    prev_orders = Order.objects.filter(created_at__gte=prev_start, created_at__lt=start_date).count()
-    prev_items = Order.objects.filter(created_at__gte=prev_start, created_at__lt=start_date).aggregate(total=db_models.Sum('total_quantities'))['total'] or 0
-    
-    orders_trend = ((total_orders - prev_orders) / prev_orders * 100) if prev_orders > 0 else 100
-    items_trend = ((total_items - prev_items) / prev_items * 100) if prev_items > 0 else 100
-    
-    # 3. Product Analysis (Parsing JSON) & Busiest Day
-    import json
-    from collections import Counter, defaultdict
-    
-    product_counter = Counter()
-    product_names_map = {} # Map product_number -> name
-    day_counter = Counter()
-    recipient_counter = Counter()
-    
-    # Daily Aggregation for Charts
-    daily_stats = defaultdict(lambda: {'orders': 0, 'quantities': 0})
-    
-    for order in orders:
-        # Day Stats
-        day_str = order.created_at.strftime('%Y-%m-%d')
-        weekday = order.created_at.strftime('%A') # e.g., Monday
-        
-        daily_stats[day_str]['orders'] += 1
-        daily_stats[day_str]['quantities'] += order.total_quantities
-        
-        day_counter[weekday] += 1
-        
-        # Recipient Stats
-        if order.recipient_name:
-            recipient_counter[order.recipient_name] += order.total_quantities
-            
-        # Product Stats
-        products = order.products_data
-        if isinstance(products, str):
-            try:
-                products = json.loads(products)
-            except:
-                products = []
-        
-        for p in products:
-            p_name = p.get('name')
-            p_num = str(p.get('product_number', '')).strip()
-            
-            # --- Fix for 'Unknown' Name ---
-            if not p_name or p_name == 'Unknown' or p_name == '':
-                # Try to fetch from DB
-                if p_num:
-                    try:
-                        # Use cache or efficient query
-                        prod = Product.objects.filter(product_number=p_num).first()
-                        if prod:
-                            p_name = prod.name
-                        else:
-                            p_name = f"منتج {p_num}"
-                    except:
-                        p_name = f"منتج {p_num}"
-                else:
-                    p_name = "غير معروف"
-            
-            qty = int(p.get('quantity_taken', p.get('quantity', 0)))
-            
-            # Aggregate by Product Number instead of Name
-            if p_num:
-                product_counter[p_num] += qty
-                # Update name mapping
-                if p_num not in product_names_map or (p_name and p_name != "غير معروف"):
-                    product_names_map[p_num] = p_name
-            else:
-                # Fallback for items without number
-                product_counter["UNKNOWN_NUM"] += qty
-                product_names_map["UNKNOWN_NUM"] = p_name or "بدون رقم"
 
-    # 4. Preparing Chart Data
-    # Trend Chart
-    sorted_days = sorted(daily_stats.keys())
-    trend_labels = sorted_days
-    trend_orders = [daily_stats[d]['orders'] for d in sorted_days]
-    trend_qtys = [daily_stats[d]['quantities'] for d in sorted_days]
-    
-    # Busiest Day
-    busiest_day_name = day_counter.most_common(1)[0][0] if day_counter else "N/A"
-    busiest_day_avg = round(total_orders / days, 1) # Simple avg for now
-    
-    # Translate Days
-    days_map = {
-        'Saturday': 'السبت', 'Sunday': 'الأحد', 'Monday': 'الاثنين',
-        'Tuesday': 'الثلاثاء', 'Wednesday': 'الأربعاء', 'Thursday': 'الخميس',
-        'Friday': 'الجمعة'
-    }
-    translated_busiest = days_map.get(busiest_day_name, busiest_day_name)
-    
-    # Day Distribution Chart
-    day_labels = [days_map.get(d, d) for d in day_counter.keys()]
-    day_data = list(day_counter.values())
-    
-    # Top Products Chart (Top 10)
-    top_products = product_counter.most_common(10)
-    
-    # Prepare labels as "Number - Name"
-    prod_labels = []
-    for p_num, count in top_products:
-        p_name = product_names_map.get(p_num, '')
-        label = f"{p_num} - {p_name}" if p_name else p_num
-        prod_labels.append(label)
-        
-    prod_data = [p[1] for p in top_products]
-    
-    # Top Recipients (Top 5)
-    top_recipients = recipient_counter.most_common(5)
-    rec_labels = [r[0] for r in top_recipients]
-    rec_data = [r[1] for r in top_recipients]
-    
-    # 5. Smart Insights Generation
-    insights = []
-    
-    # Insight 1: Growth
-    if orders_trend > 10:
-        insights.append({
-            'icon': '🚀',
-            'title': 'نمو ملحوظ',
-            'description': f'زادت الطلبات بنسبة {orders_trend:.1f}% مقارنة بالفترة السابقة.'
-        })
-    elif orders_trend < -10:
-        insights.append({
-            'icon': '📉',
-            'title': 'تراجع في الطلب',
-            'description': f'انخفضت الطلبات بنسبة {abs(orders_trend):.1f}%.'
-        })
-        
-    # Insight 2: Top Product Dominance
-    if top_products:
-        top_p = top_products[0] # (num, count)
-        share = (top_p[1] / total_items * 100) if total_items > 0 else 0
-        if share > 20:
-            p_name = product_names_map.get(top_p[0], top_p[0])
-            insights.append({
-                'icon': '⭐',
-                'title': 'منتج مسيطر',
-                'description': f'المنتج "{p_name}" ({top_p[0]}) يمثل {share:.1f}% من إجمالي المسحوبات.'
-            })
-            
-    # Insight 3: Day Activity
-    if day_counter:
-        insights.append({
-            'icon': '📅',
-            'title': 'وقت الذروة',
-            'description': f'يعتبر يوم {translated_busiest} هو الأنشط بـ {day_counter[busiest_day_name]} طلب.'
-        })
-
-    # --- 6. 12-Hour Report Logging (Lazy Generation) ---
-    try:
-        from .models import AIInsightLog
-        last_report = AIInsightLog.objects.order_by('-created_at').first()
-        should_generate = True
-        
-        if last_report:
-            diff = timezone.now() - last_report.created_at
-            if diff.total_seconds() < 12 * 3600: # 12 hours
-                should_generate = False
-        
-        if should_generate and insights:
-            # Create summary report
-            report_data = {
-                'period_stats': {
-                    'orders': total_orders,
-                    'items': total_items,
-                    'trend': f"{orders_trend:.1f}%"
-                },
-                'insights': insights,
-                'top_products': [f"{p[0]} - {product_names_map.get(p[0], '')}" for p in top_products[:3]]
-            }
-            AIInsightLog.objects.create(
-                total_orders=total_orders,
-                total_items=total_items,
-                period_hours=12,
-                insights_data=report_data
-            )
-    except Exception as e:
-        print(f"Error logging AI report: {e}")
-
-    # Fetch History for UI
-    history_logs = []
-    try:
-        logs = AIInsightLog.objects.order_by('-created_at')[:5]
-        for log in logs:
-            history_logs.append({
-                'date': log.created_at.strftime('%Y-%m-%d %H:%M'),
-                'content': log.insights_data
-            })
-    except:
-        pass
-
-    return JsonResponse({
-        'success': True,
-        'kpis': {
-            'total_orders': total_orders,
-            'total_items': total_items,
-            'busiest_day': translated_busiest,
-            'busiest_day_avg': f"{total_orders/len(day_counter):.1f}" if day_counter else 0,
-            'top_product': prod_labels[0] if prod_labels else "N/A",
-            'top_product_qty': prod_data[0] if prod_data else 0,
-            'orders_trend': f"{orders_trend:+.1f}%",
-            'items_trend': f"{items_trend:+.1f}%"
-        },
-        'charts': {
-            'trend': {'labels': trend_labels, 'orders': trend_orders, 'quantities': trend_qtys},
-            'days': {'labels': day_labels, 'data': day_data},
-            'products': {'labels': prod_labels, 'data': prod_data},
-            'recipients': {'labels': rec_labels, 'data': rec_data}
-        },
-        'insights': insights,
-        'history': history_logs
-    })
 
 @login_required
 @require_http_methods(["POST"])
@@ -5593,4 +5487,4 @@ def revert_compaction(request):
         return JsonResponse({'success': True, 'message': f'تم التراجع عن ترتيب {type_str} {undo_info["id"]} بنجاح'})
     
     except Exception as e:
-        return JsonResponse({'success': False, 'error': f'حدث خطأ أثناء التراجع: {str(e)}'})
+        return JsonResponse({'success': False, 'error': f'حدث خطأ: {str(e)}'})

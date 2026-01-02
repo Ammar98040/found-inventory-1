@@ -1,112 +1,112 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>توصيات المخزون</title>
-    {% load static %}
-    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
-
-    <style>
-        body{background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%)}
-        .header{background:linear-gradient(135deg,#22c55e 0%,#16a34a 100%);color:#fff;padding:18px;border-radius:12px;box-shadow:var(--shadow-lg)}
-        .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:16px 0}
-        .stat{color:#0f172a;border-radius:12px;box-shadow:var(--shadow-lg);padding:16px;font-weight:700}
-        .stat.reorder{background:linear-gradient(135deg,#dcfce7 0%,#86efac 100%)}
-        .stat.overstock{background:linear-gradient(135deg,#fee2e2 0%,#fca5a5 100%)}
-        .stat.watch{background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%)}
-        .section{border-radius:12px;box-shadow:var(--shadow-lg);padding:16px;margin-bottom:16px;color:#0f172a}
-        .section.reorder{background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%)}
-        .section.overstock{background:linear-gradient(135deg,#fff7ed 0%,#fee2e2 100%)}
-        .section.watch{background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%)}
-        .items{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
-        .item{background:#ffffffcc;border-radius:8px;padding:10px}
-        .badge{display:inline-block;background:#1e293b;color:#fff;border-radius:999px;padding:4px 10px;font-size:.85rem}
-        .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
-        .btn{background:#1e293b;color:#fff;padding:8px 12px;border-radius:8px;text-decoration:none}
-        .btn.secondary{background:#f1f5f9;color:#0f172a}
-        input[type="number"]{padding:8px;border:2px solid #e2e8f0;border-radius:8px;width:120px}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <h1 style="margin:0">📦 توصيات المخزون</h1>
-        </div>
-
-        <div class="stats">
-            <div class="stat watch">منخفض عام (&lt; {{ policy.low_stock_limit }})<br><span style="font-weight:600;opacity:.8">{{ counts.low_general }}</span></div>
-        </div>
-
-        {% if general_low_stock %}
-        <div class="section watch">
-            <h2>⚠️ منتجات أقل من {{ policy.low_stock_limit }} حبة</h2>
-            <div class="items">
-                {% for p in general_low_stock %}
-                    <div class="item">
-                        <div><strong>رقم:</strong> {{ p.product_number }}</div>
-                        <div><strong>اسم:</strong> {{ p.name }}</div>
-                        <div><strong>الكمية:</strong> {{ p.quantity }}</div>
-                        <a href="/products/{{ p.id }}/" class="btn" style="margin-top:8px">فتح المنتج</a>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% else %}
-        <div class="section" style="text-align:center; padding:40px; color:#64748b;">
-            <h3>✅ لا توجد منتجات منخفضة المخزون حالياً</h3>
-        </div>
-        {% endif %}
-    </div>
-
-    <button id="sidebar-toggle" onclick="toggleSidebar()">☰</button>
-    <div id="sidebar-overlay"></div>
-    <div id="main-sidebar">
-        <div class="sidebar-header">
-            <h2>🧭 القوائم</h2>
-            <button class="sidebar-close" onclick="toggleSidebar()">×</button>
-        </div>
-        <div class="sidebar-search">
-            <input type="text" id="sidebar-search-input" placeholder="🔍 ابحث في القوائم..." autocomplete="off">
-            <div id="sidebar-search-results"></div>
-        </div>
-        <div class="sidebar-content" id="sidebar-main-content">
-            <div class="sidebar-section">
-                <div class="sidebar-title">الرئيسية</div>
-                <a href="/" class="sidebar-link">
-                    <span class="icon">🔍</span>
-                    <span class="text">البحث عن المنتجات</span>
-                </a>
-                <a href="/dashboard/" class="sidebar-link">
-                    <span class="icon">📊</span>
-                    <span class="text">لوحة التحكم</span>
-                </a>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-title">السجلات</div>
-                <a href="/audit-logs/" class="sidebar-link">
-                    <span class="icon">📋</span>
-                    <span class="text">سجلات العمليات</span>
-                </a>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-title">الصيانة</div>
-                <a href="/data-quality/" class="sidebar-link">
-                    <span class="icon">🛠️</span>
-                    <span class="text">جودة البيانات</span>
-                </a>
-                <a href="/inventory-insights/" class="sidebar-link active">
-                    <span class="icon">📦</span>
-                    <span class="text">توصيات المخزون</span>
-                </a>
-            </div>
-        </div>
-    </div>
-
-
-
-    <script src="{% static 'js/sidebar.js' %}"></script>
-</body>
-</html>
+<!DOCTYPE html> 
+ <html lang="ar" dir="rtl"> 
+ <head> 
+     <meta charset="UTF-8"> 
+     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+     <title>توصيات المخزون</title> 
+     {% load static %} 
+     <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}"> 
+     <link rel="stylesheet" href="{% static 'css/style.css' %}"> 
+     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}"> 
+ 
+     <style> 
+         body{background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%)} 
+         .header{background:linear-gradient(135deg,#22c55e 0%,#16a34a 100%);color:#fff;padding:18px;border-radius:12px;box-shadow:var(--shadow-lg)} 
+         .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:16px 0} 
+         .stat{color:#0f172a;border-radius:12px;box-shadow:var(--shadow-lg);padding:16px;font-weight:700} 
+         .stat.reorder{background:linear-gradient(135deg,#dcfce7 0%,#86efac 100%)} 
+         .stat.overstock{background:linear-gradient(135deg,#fee2e2 0%,#fca5a5 100%)} 
+         .stat.watch{background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%)} 
+         .section{border-radius:12px;box-shadow:var(--shadow-lg);padding:16px;margin-bottom:16px;color:#0f172a} 
+         .section.reorder{background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%)} 
+         .section.overstock{background:linear-gradient(135deg,#fff7ed 0%,#fee2e2 100%)} 
+         .section.watch{background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%)} 
+         .items{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px} 
+         .item{background:#ffffffcc;border-radius:8px;padding:10px} 
+         .badge{display:inline-block;background:#1e293b;color:#fff;border-radius:999px;padding:4px 10px;font-size:.85rem} 
+         .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px} 
+         .btn{background:#1e293b;color:#fff;padding:8px 12px;border-radius:8px;text-decoration:none} 
+         .btn.secondary{background:#f1f5f9;color:#0f172a} 
+         input[type="number"]{padding:8px;border:2px solid #e2e8f0;border-radius:8px;width:120px} 
+     </style> 
+ </head> 
+ <body> 
+     <div class="container"> 
+         <div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;"> 
+             <h1 style="margin:0">📦 توصيات المخزون</h1> 
+         </div> 
+ 
+         <div class="stats"> 
+             <div class="stat watch">منخفض عام (&le; {{ policy.low_stock_limit }})<br><span style="font-weight:600;opacity:.8">{{ counts.low_general }}</span></div> 
+         </div> 
+ 
+         {% if general_low_stock %} 
+         <div class="section watch"> 
+             <h2>⚠️ منتجات {{ policy.low_stock_limit }} حبة أو أقل</h2> 
+             <div class="items"> 
+                 {% for p in general_low_stock %} 
+                     <div class="item"> 
+                         <div><strong>رقم:</strong> {{ p.product_number }}</div> 
+                         <div><strong>اسم:</strong> {{ p.name }}</div> 
+                         <div><strong>الكمية:</strong> {{ p.quantity }}</div> 
+                         <a href="/products/{{ p.id }}/" class="btn" style="margin-top:8px">فتح المنتج</a> 
+                     </div> 
+                 {% endfor %} 
+             </div> 
+         </div> 
+         {% else %} 
+         <div class="section" style="text-align:center; padding:40px; color:#64748b;"> 
+             <h3>✅ لا توجد منتجات منخفضة المخزون حالياً</h3> 
+         </div> 
+         {% endif %} 
+     </div> 
+ 
+     <button id="sidebar-toggle" onclick="toggleSidebar()">☰</button> 
+     <div id="sidebar-overlay"></div> 
+     <div id="main-sidebar"> 
+         <div class="sidebar-header"> 
+             <h2>🧭 القوائم</h2> 
+             <button class="sidebar-close" onclick="toggleSidebar()">×</button> 
+         </div> 
+         <div class="sidebar-search"> 
+             <input type="text" id="sidebar-search-input" placeholder="🔍 ابحث في القوائم..." autocomplete="off"> 
+             <div id="sidebar-search-results"></div> 
+         </div> 
+         <div class="sidebar-content" id="sidebar-main-content"> 
+             <div class="sidebar-section"> 
+                 <div class="sidebar-title">الرئيسية</div> 
+                 <a href="/" class="sidebar-link"> 
+                     <span class="icon">🔍</span> 
+                     <span class="text">البحث عن المنتجات</span> 
+                 </a> 
+                 <a href="/dashboard/" class="sidebar-link"> 
+                     <span class="icon">📊</span> 
+                     <span class="text">لوحة التحكم</span> 
+                 </a> 
+             </div> 
+             <div class="sidebar-section"> 
+                 <div class="sidebar-title">السجلات</div> 
+                 <a href="/audit-logs/" class="sidebar-link"> 
+                     <span class="icon">📋</span> 
+                     <span class="text">سجلات العمليات</span> 
+                 </a> 
+             </div> 
+             <div class="sidebar-section"> 
+                 <div class="sidebar-title">الصيانة</div> 
+                 <a href="/data-quality/" class="sidebar-link"> 
+                     <span class="icon">🛠️</span> 
+                     <span class="text">جودة البيانات</span> 
+                 </a> 
+                 <a href="/inventory-insights/" class="sidebar-link active"> 
+                     <span class="icon">📦</span> 
+                     <span class="text">توصيات المخزون</span> 
+                 </a> 
+             </div> 
+         </div> 
+     </div> 
+ 
+ 
+ 
+     <script src="{% static 'js/sidebar.js' %}"></script> 
+ </body> 
+ </html>

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}تسجيل الدخول - الصندوق الأسود{% endblock %}
+
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="card shadow-lg" style="width: 100%; max-width: 400px;">
+        <div class="card-header bg-dark text-white text-center py-3">
+            <h4 class="mb-0"><i class="fas fa-user-secret me-2"></i> الصندوق الأسود</h4>
+        </div>
+        <div class="card-body p-4">
+            <div class="text-center mb-4">
+                <i class="fas fa-lock fa-3x text-warning"></i>
+                <p class="text-muted mt-2">هذه المنطقة محمية وتتطلب تصريح خاص</p>
+            </div>
+            
+            {% if error %}
+            <div class="alert alert-danger">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="password" class="form-label">كلمة المرور الخاصة</label>
+                    <input type="password" class="form-control form-control-lg text-center" id="password" name="password" required autofocus autocomplete="off">
+                </div>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-dark btn-lg">
+                        <i class="fas fa-key me-2"></i> دخول
+                    </button>
+                </div>
+            </form>
+        </div>
+        <div class="card-footer text-center text-muted small">
+            Secure Backup Access Control
+        </div>
+    </div>
+</div>
+{% endblock %}

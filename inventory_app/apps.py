@@ -6,3 +6,6 @@ class InventoryAppConfig(AppConfig):
     name = 'inventory_app'
     verbose_name = 'نظام إدارة المستودع'
 
+    def ready(self):
+        import inventory_app.signals
+

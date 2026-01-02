@@ -1,430 +1,298 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة التحكم - Dashboard</title>
-    {% load static %}
-    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
-    <link rel="stylesheet" href="{% static 'css/quick_search.css' %}">
+{% extends 'base.html' %}
+{% load static %}
 
-    <style>
+{% block title %}لوحة التحكم - Dashboard{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'css/quick_search.css' %}">
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin: 30px 0;
+    }
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 30px;
+        border-radius: 12px;
+        color: white;
+        text-align: center;
+        box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+    }
+    .stat-card.products {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    .stat-card.locations {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    .stat-card.capacity {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    }
+    .stat-icon {
+        font-size: 3rem;
+        margin-bottom: 15px;
+    }
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 10px 0;
+    }
+    .stat-label {
+        font-size: 1.1rem;
+        opacity: 0.9;
+    }
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 30px;
+    }
+    
+    @media (max-width: 768px) {
         .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
+            grid-template-columns: 1fr;
         }
         .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 30px;
-            border-radius: 12px;
-            color: white;
-            text-align: center;
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
-        }
-        .stat-card.products {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-        .stat-card.locations {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        }
-        .stat-card.capacity {
-            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            padding: 20px;
         }
         .stat-icon {
-            font-size: 3rem;
-            margin-bottom: 15px;
+            font-size: 2rem;
         }
         .stat-number {
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-        .stat-label {
-            font-size: 1.1rem;
-            opacity: 0.9;
+            font-size: 1.8rem;
         }
         .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 30px;
+            grid-template-columns: 1fr;
         }
-        
-        @media (max-width: 768px) {
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
-            .stat-card {
-                padding: 20px;
-            }
-            .stat-icon {
-                font-size: 2rem;
-            }
-            .stat-number {
-                font-size: 1.8rem;
-            }
-            .quick-actions {
-                grid-template-columns: 1fr;
-            }
-            .page-header div {
-                flex-direction: column;
-                gap: 10px;
-            }
-        }
-        .action-btn {
-            padding: 20px;
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
-            text-decoration: none;
-            text-align: center;
-            transition: all 0.3s;
-            color: var(--text-primary);
-        }
-        .action-btn:hover {
-            border-color: var(--primary-color);
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-        .action-icon {
-            font-size: 2rem;
-            margin-bottom: 10px;
-            display: block;
-        }
-        .low-stock-row { background: #fff5f5; }
-        .badge-critical { background: #ff6b6b; }
-        .badge-low { background: #f59e0b; }
-        .badge-warn { background: #fbbf24; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>📊 لوحة التحكم</h1>
-            
-        </header>
+    }
+    .action-btn {
+        padding: 20px;
+        background: white;
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        text-decoration: none;
+        text-align: center;
+        transition: all 0.3s;
+        color: var(--text-primary);
+    }
+    .action-btn:hover {
+        border-color: var(--primary-color);
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+    .action-icon {
+        font-size: 2rem;
+        margin-bottom: 10px;
+        display: block;
+    }
+    .low-stock-row { background: #fff5f5; }
+    .badge-critical { background: #ff6b6b; }
+    .badge-low { background: #f59e0b; }
+    .badge-warn { background: #fbbf24; }
+</style>
+{% endblock %}
 
-        
+{% block page_title %}📊 لوحة التحكم{% endblock %}
 
-        <!-- إحصائيات -->
-        <div class="dashboard-grid">
-            <div class="stat-card">
-                <div class="stat-icon">🏢</div>
-                <div class="stat-number">{{ warehouse.name|default:"المستودع الرئيسي" }}</div>
-                <div class="stat-label">المستودع</div>
-                <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">
-                    {{ warehouse.rows_count }} صف × {{ warehouse.columns_count }} عمود
-                </div>
-            </div>
-
-            <div class="stat-card products">
-                <div class="stat-icon">📦</div>
-                <div class="stat-number">{{ products_count }}</div>
-                <div class="stat-label">المنتجات</div>
-                <a href="/products/" style="color: white; text-decoration: underline; display: inline-block; margin-top: 10px;">
-                    عرض المنتجات →
-                </a>
-            </div>
-
-            <div class="stat-card locations">
-                <div class="stat-icon">📍</div>
-                <div class="stat-number">{{ locations_count }}</div>
-                <div class="stat-label">الأماكن</div>
-                <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">
-                    {{ locations_count }} موقع متاح
-                </div>
-            </div>
-
-            <div class="stat-card capacity">
-                <div class="stat-icon">⚡</div>
-                <div class="stat-number">{{ total_capacity }}</div>
-                <div class="stat-label">السعة الكلية</div>
-                <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">
-                    موقع
-                </div>
+{% block content %}
+    <!-- إحصائيات -->
+    <div class="dashboard-grid">
+        <div class="stat-card">
+            <div class="stat-icon">🏢</div>
+            <div class="stat-number">{{ warehouse.name|default:"المستودع الرئيسي" }}</div>
+            <div class="stat-label">المستودع</div>
+            <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">
+                {{ warehouse.rows_count }} صف × {{ warehouse.columns_count }} عمود
             </div>
         </div>
 
-        <!-- إحصائيات إضافية -->
-        <div class="dashboard-grid" style="margin-top: 20px;">
-            <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                <div class="stat-icon">📦</div>
-                <div class="stat-number">{{ containers_count }}</div>
-                <div class="stat-label">الحاويات</div>
-                <a href="/containers/" style="color: white; text-decoration: underline; display: inline-block; margin-top: 10px;">
-                    إدارة الحاويات →
-                </a>
-            </div>
+        <div class="stat-card products">
+            <div class="stat-icon">📦</div>
+            <div class="stat-number">{{ products_count }}</div>
+            <div class="stat-label">المنتجات</div>
+            <a href="{% url 'inventory_app:products_list' %}" style="color: white; text-decoration: underline; display: inline-block; margin-top: 10px;">
+                عرض المنتجات →
+            </a>
+        </div>
 
-            <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                <div class="stat-icon">📋</div>
-                <div class="stat-number">{{ orders_count }}</div>
-                <div class="stat-label">الطلبات المسحوبة</div>
-                <a href="/orders/" style="color: white; text-decoration: underline; display: inline-block; margin-top: 10px;">
-                    عرض الطلبات →
-                </a>
-            </div>
-
-            <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                <div class="stat-icon">↩️</div>
-                <div class="stat-number">{{ returns_count }}</div>
-                <div class="stat-label">المرتجعات</div>
-                <a href="/returns/" style="color: white; text-decoration: underline; display: inline-block; margin-top: 10px;">
-                    عرض المرتجعات →
-                </a>
-            </div>
-
-            <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-                <div class="stat-icon">📊</div>
-                <div class="stat-number">{{ total_quantity|floatformat:0 }}</div>
-                <div class="stat-label">إجمالي الكمية</div>
-                <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">
-                    حبة في المخزون
-                </div>
+        <div class="stat-card locations">
+            <div class="stat-icon">📍</div>
+            <div class="stat-number">{{ locations_count }}</div>
+            <div class="stat-label">الأماكن</div>
+            <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">
+                {{ locations_count }} موقع متاح
             </div>
         </div>
 
-        <!-- تقارير الذكاء الاصطناعي -->
-        {% if latest_ai_reports %}
-        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); margin-top: 30px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="margin: 0; font-size: 1.5rem;">🧠 تقارير الذكاء الاصطناعي الأخيرة</h2>
-                <a href="/inventory-insights/" style="color: var(--primary-color); text-decoration: none; font-weight: bold;">عرض كل الرؤى →</a>
-            </div>
-            
-            <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr>
-                            <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb; color: #4b5563;">التاريخ</th>
-                            <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb; color: #4b5563;">الفترة</th>
-                            <th style="text-align: center; padding: 12px; border-bottom: 2px solid #e5e7eb; color: #4b5563;">الطلبات</th>
-                            <th style="text-align: center; padding: 12px; border-bottom: 2px solid #e5e7eb; color: #4b5563;">العناصر</th>
-                            <th style="text-align: right; padding: 12px; border-bottom: 2px solid #e5e7eb; color: #4b5563;">أهم الرؤى</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for report in latest_ai_reports %}
-                        <tr>
-                            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">{{ report.created_at|date:"Y-m-d H:i" }}</td>
-                            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">{{ report.period_hours }} ساعات</td>
-                            <td style="text-align: center; padding: 12px; border-bottom: 1px solid #e5e7eb;">{{ report.total_orders }}</td>
-                            <td style="text-align: center; padding: 12px; border-bottom: 1px solid #e5e7eb;">{{ report.total_items }}</td>
-                            <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
-                                <ul style="margin: 0; padding-right: 20px; font-size: 0.9em; color: #4b5563;">
-                                    {% for insight in report.insights_data|slice:":2" %}
-                                    <li style="margin-bottom: 4px;">{{ insight }}</li>
-                                    {% empty %}
-                                    <li>لا توجد ملاحظات هامة</li>
-                                    {% endfor %}
-                                </ul>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- إجراءات سريعة -->
-        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); margin-top: 30px;">
-            <h2 style="margin-bottom: 20px;">⚡ إجراءات سريعة</h2>
-            <div class="quick-actions">
-                <a href="/" class="action-btn">
-                    <span class="action-icon">🔍</span>
-                    <strong>البحث عن المنتجات</strong>
-                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
-                        ابحث عن منتجاتك فوراً
-                    </p>
-                </a>
-
-                <a href="/products/" class="action-btn">
-                    <span class="action-icon">📦</span>
-                    <strong>قائمة المنتجات</strong>
-                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
-                        عرض جميع المنتجات
-                    </p>
-                </a>
-
-                <a href="/manage/" class="action-btn">
-                    <span class="action-icon">⚙️</span>
-                    <strong>إدارة المستودع</strong>
-                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
-                        إضافة/حذف صفوف وأعمدة
-                    </p>
-                </a>
-
-                <a href="/locations/" class="action-btn">
-                    <span class="action-icon">📍</span>
-                    <strong>الأماكن</strong>
-                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
-                        عرض جميع الأماكن
-                    </p>
-                </a>
-
-                <a href="/audit-logs/" class="action-btn">
-                    <span class="action-icon">📋</span>
-                    <strong>سجلات العمليات</strong>
-                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
-                        تتبع جميع العمليات
-                    </p>
-                </a>
-
-                
-
-                <a href="/containers/" class="action-btn" style="border-color: #667eea;">
-                    <span class="action-icon">📦</span>
-                    <strong>إدارة الحاويات</strong>
-                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
-                        تنظيم المنتجات في حاويات
-                    </p>
-                </a>
-
-                <a href="/orders/" class="action-btn">
-                    <span class="action-icon">📋</span>
-                    <strong>الطلبات المسحوبة</strong>
-                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
-                        عرض جميع الطلبات
-                    </p>
-                </a>
-
-                <a href="/returns/" class="action-btn">
-                    <span class="action-icon">↩️</span>
-                    <strong>المرتجعات</strong>
-                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
-                        إدارة المرتجعات
-                    </p>
-                </a>
-                <a href="/inventory-insights/" class="action-btn">
-                    <span class="action-icon">📦</span>
-                    <strong>توصيات المخزون</strong>
-                    <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
-                        إعادة الطلب والتوازن بدقة
-                    </p>
-                </a>
-            </div>
-        </div>
-
-        
-
-        <!-- معلومات المستودع -->
-        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: var(--shadow-lg); margin-top: 30px;">
-            <h2>📋 معلومات المستودع</h2>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
-                <div style="padding: 15px; background: #f8fafc; border-radius: 8px;">
-                    <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 5px;">عدد الصفوف</div>
-                    <div style="font-size: 1.5rem;">{{ warehouse.rows_count }}</div>
-                </div>
-                <div style="padding: 15px; background: #f8fafc; border-radius: 8px;">
-                    <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 5px;">عدد الأعمدة</div>
-                    <div style="font-size: 1.5rem;">{{ warehouse.columns_count }}</div>
-                </div>
-                <div style="padding: 15px; background: #f8fafc; border-radius: 8px;">
-                    <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 5px;">السعة الكلية</div>
-                    <div style="font-size: 1.5rem;">{{ total_capacity }}</div>
-                </div>
-                <div style="padding: 15px; background: #f8fafc; border-radius: 8px;">
-                    <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 5px;">الأماكن المستخدمة</div>
-                    <div style="font-size: 1.5rem;">
-                        {% if warehouse %}
-                            {% with ratio=warehouse.locations.count|floatformat:0 %}
-                                {{ ratio|default:0 }}
-                            {% endwith %}
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- روابط سريعة -->
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px; color: white; margin-top: 30px; text-align: center;">
-            <h2 style="margin-bottom: 20px;">🚀 ابدأ الآن</h2>
-            <p style="margin-bottom: 20px; font-size: 1.1rem;">استكشف جميع ميزات النظام</p>
-            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                <a href="/" style="background: white; color: #667eea; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-                    🔍 البحث
-                </a>
-                <a href="/products/" style="background: white; color: #667eea; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-                    📦 المنتجات
-                </a>
-                <a href="/manage/" style="background: white; color: #667eea; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-                    ⚙️ الإدارة
-                </a>
+        <div class="stat-card capacity">
+            <div class="stat-icon">⚡</div>
+            <div class="stat-number">{{ total_capacity }}</div>
+            <div class="stat-label">السعة الكلية</div>
+            <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">
+                موقع
             </div>
         </div>
     </div>
-    
-    <!-- Sidebar -->
-    <button id="sidebar-toggle" onclick="toggleSidebar()">☰</button>
-    
-    <div id="sidebar-overlay"></div>
-    
-    <div id="main-sidebar">
-        <div class="sidebar-header">
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <img src="{% static 'img/favicon.svg' %}" alt="شعار" style="width: 32px; height: 32px;">
-                <div>
-                    <h2 style="font-size: 1.1rem; margin-bottom: 2px;">قلب العرب</h2>
-                    <div style="font-size: 0.75rem; color: #9ca3af; font-weight: normal;">نظام إدارة المخزون</div>
+
+    <!-- إحصائيات إضافية -->
+    <div class="dashboard-grid" style="margin-top: 20px;">
+        <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="stat-icon">📦</div>
+            <div class="stat-number">{{ containers_count }}</div>
+            <div class="stat-label">الحاويات</div>
+            <a href="{% url 'inventory_app:container_list' %}" style="color: white; text-decoration: underline; display: inline-block; margin-top: 10px;">
+                إدارة الحاويات →
+            </a>
+        </div>
+
+        <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="stat-icon">📋</div>
+            <div class="stat-number">{{ orders_count }}</div>
+            <div class="stat-label">الطلبات المسحوبة</div>
+            <a href="{% url 'inventory_app:orders_list' %}" style="color: white; text-decoration: underline; display: inline-block; margin-top: 10px;">
+                عرض الطلبات →
+            </a>
+        </div>
+
+        <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+            <div class="stat-icon">↩️</div>
+            <div class="stat-number">{{ returns_count }}</div>
+            <div class="stat-label">المرتجعات</div>
+            <a href="{% url 'inventory_app:returns_list' %}" style="color: white; text-decoration: underline; display: inline-block; margin-top: 10px;">
+                عرض المرتجعات →
+            </a>
+        </div>
+
+        <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+            <div class="stat-icon">📊</div>
+            <div class="stat-number">{{ total_quantity|floatformat:0 }}</div>
+            <div class="stat-label">إجمالي الكمية</div>
+            <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;">
+                حبة في المخزون
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- إجراءات سريعة -->
+    <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); margin-top: 30px;">
+        <h2 style="margin-bottom: 20px;">⚡ إجراءات سريعة</h2>
+        <div class="quick-actions">
+            <a href="{% url 'inventory_app:home' %}" class="action-btn">
+                <span class="action-icon">🔍</span>
+                <strong>البحث عن المنتجات</strong>
+                <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
+                    ابحث عن منتجاتك فوراً
+                </p>
+            </a>
+
+            <a href="{% url 'inventory_app:products_list' %}" class="action-btn">
+                <span class="action-icon">📦</span>
+                <strong>قائمة المنتجات</strong>
+                <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
+                    عرض جميع المنتجات
+                </p>
+            </a>
+
+            <a href="{% url 'inventory_app:manage_warehouse' %}" class="action-btn">
+                <span class="action-icon">⚙️</span>
+                <strong>إدارة المستودع</strong>
+                <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
+                    إضافة/حذف صفوف وأعمدة
+                </p>
+            </a>
+
+            <a href="{% url 'inventory_app:locations_list' %}" class="action-btn">
+                <span class="action-icon">📍</span>
+                <strong>الأماكن</strong>
+                <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
+                    عرض جميع الأماكن
+                </p>
+            </a>
+
+            <a href="{% url 'inventory_app:audit_logs' %}" class="action-btn">
+                <span class="action-icon">📋</span>
+                <strong>سجلات العمليات</strong>
+                <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
+                    تتبع جميع العمليات
+                </p>
+            </a>
+
+            <a href="{% url 'inventory_app:container_list' %}" class="action-btn" style="border-color: #667eea;">
+                <span class="action-icon">📦</span>
+                <strong>إدارة الحاويات</strong>
+                <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
+                    تنظيم المنتجات في حاويات
+                </p>
+            </a>
+
+            <a href="{% url 'inventory_app:orders_list' %}" class="action-btn">
+                <span class="action-icon">📋</span>
+                <strong>الطلبات المسحوبة</strong>
+                <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
+                    عرض جميع الطلبات
+                </p>
+            </a>
+
+            <a href="{% url 'inventory_app:returns_list' %}" class="action-btn">
+                <span class="action-icon">↩️</span>
+                <strong>المرتجعات</strong>
+                <p style="margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem;">
+                    إدارة المرتجعات
+                </p>
+            </a>
+
+        </div>
+    </div>
+
+    <!-- معلومات المستودع -->
+    <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: var(--shadow-lg); margin-top: 30px;">
+        <h2>📋 معلومات المستودع</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
+            <div style="padding: 15px; background: #f8fafc; border-radius: 8px;">
+                <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 5px;">عدد الصفوف</div>
+                <div style="font-size: 1.5rem;">{{ warehouse.rows_count }}</div>
+            </div>
+            <div style="padding: 15px; background: #f8fafc; border-radius: 8px;">
+                <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 5px;">عدد الأعمدة</div>
+                <div style="font-size: 1.5rem;">{{ warehouse.columns_count }}</div>
+            </div>
+            <div style="padding: 15px; background: #f8fafc; border-radius: 8px;">
+                <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 5px;">السعة الكلية</div>
+                <div style="font-size: 1.5rem;">{{ total_capacity }}</div>
+            </div>
+            <div style="padding: 15px; background: #f8fafc; border-radius: 8px;">
+                <div style="font-weight: bold; color: var(--primary-color); margin-bottom: 5px;">الأماكن المستخدمة</div>
+                <div style="font-size: 1.5rem;">
+                    {% if warehouse %}
+                        {% with ratio=warehouse.locations.count|floatformat:0 %}
+                            {{ ratio|default:0 }}
+                        {% endwith %}
+                    {% endif %}
                 </div>
             </div>
-            <button class="sidebar-close" onclick="toggleSidebar()">×</button>
         </div>
-        
-        <!-- حقل البحث -->
-        <div class="sidebar-search">
-            <input type="text" id="sidebar-search-input" placeholder="🔍 ابحث في القوائم..." autocomplete="off">
-            <div id="sidebar-search-results"></div>
+    </div>
+
+    <!-- روابط سريعة -->
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px; color: white; margin-top: 30px; text-align: center;">
+        <h2 style="margin-bottom: 20px;">🚀 ابدأ الآن</h2>
+        <p style="margin-bottom: 20px; font-size: 1.1rem;">استكشف جميع ميزات النظام</p>
+        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <a href="{% url 'inventory_app:home' %}" style="background: white; color: #667eea; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                🔍 البحث
+            </a>
+            <a href="{% url 'inventory_app:products_list' %}" style="background: white; color: #667eea; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                📦 المنتجات
+            </a>
+            <a href="{% url 'inventory_app:manage_warehouse' %}" style="background: white; color: #667eea; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                ⚙️ الإدارة
+            </a>
         </div>
-        
-        <div class="sidebar-content" id="sidebar-main-content">
-            <div class="sidebar-section">
-                <div class="sidebar-title">الرئيسية</div>
-                <a href="/" class="sidebar-link">
-                    <span class="icon">🔍</span>
-                    <span class="text">البحث عن المنتجات</span>
-                </a>
-                <a href="/dashboard/" class="sidebar-link active">
-                    <span class="icon">📊</span>
-                    <span class="text">لوحة التحكم</span>
-                </a>
-            </div>
-            
-            <div class="sidebar-section">
-                <div class="sidebar-title">إدارة المنتجات</div>
-                <a href="/products/" class="sidebar-link">
-                    <span class="icon">📦</span>
-                    <span class="text">قائمة المنتجات</span>
-                </a>
-                <a href="/products/add/" class="sidebar-link">
-                    <span class="icon">➕</span>
-                    <span class="text">إضافة منتج جديد</span>
-                </a>
-            </div>
-            
-            <div class="sidebar-section">
-                <div class="sidebar-title">المستودع</div>
-                <a href="/manage/" class="sidebar-link">
-                    <span class="icon">⚙️</span>
-                    <span class="text">إدارة المستودع</span>
-                </a>
-                <a href="/locations/" class="sidebar-link">
-                    <span class="icon">📍</span>
-                    <span class="text">الأماكن</span>
-                </a>
-            </div>
-            
-            <div class="sidebar-section">
-                <div class="sidebar-title">السجلات</div>
-                <a href="/audit-logs/" class="sidebar-link">
-                    <span class="icon">📋</span>
-                    <span class="text">سجلات العمليات</span>
-                </a>
+    </div>
+{% endblock %}                </a>
             </div>
             
             

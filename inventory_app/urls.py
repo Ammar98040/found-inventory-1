@@ -62,16 +62,12 @@ urlpatterns = [
     path('audit-logs/', views.audit_logs, name='audit_logs'),
     path('audit-logs/restore/<int:log_id>/', views.restore_product, name='restore_product'),
     
-    # التقارير اليومية (محذوفة)
-    
     # النسخ الاحتياطي والاستعادة
     path('backup-restore/', views.backup_restore_page, name='backup_restore'),
     path('api/export-backup/', views.export_backup, name='export_backup'),
     path('api/inspect-backup/', views.inspect_backup, name='inspect_backup'),
     path('api/import-backup/', views.import_backup, name='import_backup'),
     path('api/reset-environment/', views.reset_environment, name='reset_environment'),
-    path('data-quality/', views.data_quality_report, name='data_quality'),
-    path('inventory-insights/', views.inventory_insights, name='inventory_insights'),
     path('api/low-stock/', views.low_stock_products_api, name='low_stock_products_api'),
     
     # دمج ملفات المنتجات (Excel/JSON)
@@ -84,23 +80,21 @@ urlpatterns = [
     path('data-deletion/', views.data_deletion_page, name='data_deletion'),
     path('api/delete-data/', views.delete_data, name='delete_data'),
     
+    # جودة البيانات وتوصيات المخزون
+    # (Removed duplicates)
+    
     # إدارة الطلبات المسحوبة
     path('orders/', views.orders_list, name='orders_list'),
-    path('analytics/', views.analytics_dashboard, name='analytics_dashboard'),
-    path('api/analytics-data/', views.get_analytics_data, name='get_analytics_data'),
-    path('api/search-order-history/', views.search_order_history, name='search_order_history'),
-    path('api/recipients-stats/', views.get_all_recipients_stats, name='get_all_recipients_stats'),
     path('orders/<int:order_id>/', views.order_detail, name='order_detail'),
     path('api/delete-order/<int:order_id>/', views.delete_order, name='delete_order'),
+    path('api/search-order-history/', views.search_order_history, name='search_order_history'),
+    path('api/recipients-stats/', views.get_all_recipients_stats, name='get_all_recipients_stats'),
     
     # المرتجعات
     path('returns/', views.returns_list, name='returns_list'),
     path('returns/add/', views.add_return, name='add_return'),
     path('returns/<int:return_id>/', views.return_detail, name='return_detail'),
     path('api/process-return/', views.process_return, name='process_return'),
-    
-    # تصفير الكميات
-    path('api/reset-all-quantities/', views.reset_all_quantities, name='reset_all_quantities'),
     
     # نظام المستخدمين
     path('register/', views.register_staff, name='register_staff'),
@@ -119,5 +113,14 @@ urlpatterns = [
     path('api/container/add/', views.container_add, name='container_add'),
     path('api/container/<int:container_id>/delete/', views.container_delete, name='container_delete'),
     path('api/assign-products-to-container/', views.assign_products_to_container, name='assign_products_to_container'),
+
+    # النسخ الاحتياطي الآمن (الصندوق الأسود)
+    path('secure-backup/login/', views.secure_backup_login, name='secure_backup_login'),
+    path('secure-backup/', views.secure_backup_dashboard, name='secure_backup_dashboard'),
+    path('api/secure-backup/<int:backup_id>/', views.get_secure_backup_detail, name='get_secure_backup_detail'),
+
+    # أدوات الجودة والتحليل
+    path('data-quality/', views.data_quality, name='data_quality'),
+    path('inventory-insights/', views.inventory_insights, name='inventory_insights'),
 
 ]

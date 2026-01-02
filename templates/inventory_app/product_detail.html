@@ -369,11 +369,14 @@
         }
         
         // السماح بالضغط على Enter
-        document.getElementById('new-location-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                moveProductWithShift();
-            }
-        });
+        const newLocationInput = document.getElementById('new-location-input');
+        if (newLocationInput) {
+            newLocationInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    moveProductWithShift();
+                }
+            });
+        }
     </script>
     <script src="{% static 'js/quick_search.js' %}"></script>
 

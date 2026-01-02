@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}السجل الآمن (الصندوق الأسود){% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">🛡️ السجل الآمن (الصندوق الأسود)</h1>
+            <p class="text-muted">سجل كامل لجميع العمليات والتغييرات في النظام، محمي وغير قابل للتعديل.</p>
+        </div>
+        <div class="header-actions">
+            <span class="badge badge-success">
+                <i class="fas fa-shield-alt"></i> محمي ومشفر
+            </span>
+        </div>
+    </div>
+
+    <!-- إحصائيات -->
+    <div class="stats-grid mb-4">
+        <div class="stat-card">
+            <div class="stat-icon bg-primary-light text-primary">
+                <i class="fas fa-database"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ stats.total }}</h3>
+                <p>إجمالي السجلات</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-success-light text-success">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ stats.today }}</h3>
+                <p>سجلات اليوم</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-danger-light text-danger">
+                <i class="fas fa-trash-alt"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ stats.deleted_items }}</h3>
+                <p>عناصر محذوفة</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- فلاتر البحث -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">بحث (ID أو Hash)</label>
+                    <input type="text" name="q" class="form-control" value="{{ current_filters.q }}" placeholder="بحث...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">الجدول</label>
+                    <select name="table" class="form-select">
+                        <option value="">الكل</option>
+                        {% for table in tables %}
+                        <option value="{{ table }}" {% if current_filters.table == table %}selected{% endif %}>{{ table }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">العملية</label>
+                    <select name="action" class="form-select">
+                        <option value="">الكل</option>
+                        <option value="create" {% if current_filters.action == 'create' %}selected{% endif %}>إنشاء</option>
+                        <option value="update" {% if current_filters.action == 'update' %}selected{% endif %}>تحديث</option>
+                        <option value="delete" {% if current_filters.action == 'delete' %}selected{% endif %}>حذف</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">من تاريخ</label>
+                    <input type="date" name="date_from" class="form-control" value="{{ current_filters.date_from }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">إلى تاريخ</label>
+                    <input type="date" name="date_to" class="form-control" value="{{ current_filters.date_to }}">
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- جدول البيانات -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>الوقت</th>
+                            <th>الجدول</th>
+                            <th>رقم السجل</th>
+                            <th>العملية</th>
+                            <th>التوقيع الرقمي (Hash)</th>
+                            <th>البيانات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for backup in page_obj %}
+                        <tr>
+                            <td>#{{ backup.id }}</td>
+                            <td dir="ltr">{{ backup.timestamp|date:"Y-m-d H:i:s" }}</td>
+                            <td><span class="badge bg-secondary">{{ backup.table_name }}</span></td>
+                            <td>{{ backup.record_id }}</td>
+                            <td>
+                                {% if backup.action == 'create' %}
+                                <span class="badge bg-success">إنشاء</span>
+                                {% elif backup.action == 'update' %}
+                                <span class="badge bg-info text-dark">تحديث</span>
+                                {% elif backup.action == 'delete' %}
+                                <span class="badge bg-danger">حذف</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <code class="small text-muted" title="{{ backup.hash_signature }}">
+                                    {{ backup.hash_signature|truncatechars:10 }}...
+                                </code>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewBackupData('{{ backup.id }}')">
+                                    <i class="fas fa-eye"></i> عرض
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="fas fa-box-open fa-3x mb-3"></i>
+                                <p>لا توجد سجلات مطابقة</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% if page_obj.has_other_pages %}
+        <div class="card-footer">
+            {% include 'includes/pagination.html' with page_obj=page_obj %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal عرض البيانات -->
+<div class="modal fade" id="dataModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تفاصيل النسخة الاحتياطية</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>الجدول:</strong> <span id="modal-table"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>العملية:</strong> <span id="modal-action"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>التاريخ:</strong> <span id="modal-date"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>رقم السجل:</strong> <span id="modal-record-id"></span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <strong>التوقيع الرقمي (Hash):</strong>
+                    <div class="alert alert-secondary py-2 mt-1 font-monospace small" id="modal-hash" style="word-break: break-all;"></div>
+                </div>
+                <div class="mb-0">
+                    <strong>البيانات المحفوظة:</strong>
+                    <pre class="bg-dark text-light p-3 rounded mt-1" id="modal-data" style="max-height: 400px; overflow-y: auto; direction: ltr; text-align: left;"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function viewBackupData(id) {
+    fetch(`/inventory/api/secure-backup/${id}/`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('modal-table').textContent = data.table;
+            document.getElementById('modal-action').textContent = data.action;
+            document.getElementById('modal-date').textContent = data.timestamp;
+            document.getElementById('modal-record-id').textContent = data.record_id;
+            document.getElementById('modal-hash').textContent = data.hash;
+            document.getElementById('modal-data').textContent = JSON.stringify(data.data, null, 2);
+            
+            new bootstrap.Modal(document.getElementById('dataModal')).show();
+        })
+        .catch(error => alert('حدث خطأ أثناء جلب البيانات'));
+}
+</script>
+
+<style>
+.stat-card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+.stat-info h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+.stat-info p {
+    margin: 0;
+    color: #6c757d;
+}
+.bg-primary-light { background: rgba(13, 110, 253, 0.1); }
+.bg-success-light { background: rgba(25, 135, 84, 0.1); }
+.bg-danger-light { background: rgba(220, 53, 69, 0.1); }
+</style>
+{% endblock %}

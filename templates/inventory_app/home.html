@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="{% static 'css/search_grid.css' %}">
     <link rel="stylesheet" href="{% static 'css/sidebar.css' %}">
     <link rel="stylesheet" href="{% static 'css/quick_search.css' %}">
+    <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
 
     <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     
@@ -722,15 +723,15 @@
     </div>
     
     <script src="{% static 'js/sidebar.js' %}?v=2.3"></script>
+    <script src="{% static 'js/notifications.js' %}?v=2.3"></script>
     <script src="{% static 'js/auto_refresh.js' %}?v=2.3"></script>
     <script src="{% static 'js/quick_search.js' %}?v=2.3"></script>
-    <script src="{% static 'js/offline_sync.js' %}?v=1.0"></script>
     <script src="{% static 'js/main.js' %}?v=2.3"></script>
     
     <script>
         // عرض إشعارات عند تحميل الصفحة (للاختبار)
         document.addEventListener('DOMContentLoaded', function() {
-            // إشعار ترحيبي
+            // إشعار ترحيبي - البحث السريع
             setTimeout(() => {
                 Notifications.info(
                     '🔍 نظام البحث السريع',
@@ -738,6 +739,8 @@
                     5000
                 );
             }, 1000);
+
+
         });
         
         // إشعارات بعد البحث

@@ -7,7 +7,7 @@ class Warehouse(models.Model):
     description = models.TextField(blank=True, null=True)
     rows_count = models.IntegerField(default=0)
     columns_count = models.IntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return self.name
@@ -145,6 +145,35 @@ class UserProfile(models.Model):
     def __str__(self):
         return self.user.username
 
+class SecureBackup(models.Model):
+    """
+    نموذج النسخ الاحتياطي الآمن (الصندوق الأسود).
+    يقوم بتخزين نسخة كاملة من أي سجل يتم إنشاؤه أو تعديله في النظام.
+    لا يتم عرض هذه البيانات في الواجهة العادية وتستخدم فقط للاسترجاع في حالات الطوارئ.
+    """
+    ACTION_CHOICES = (
+        ('create', 'إنشاء'),
+        ('update', 'تحديث'),
+        ('delete', 'حذف'),
+    )
+    
+    table_name = models.CharField(max_length=100)
+    record_id = models.IntegerField()
+    backup_data = models.JSONField(default=dict)  # نسخة كاملة من البيانات
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    hash_signature = models.CharField(max_length=64, blank=True, null=True)  # توقيع رقمي لضمان عدم التلاعب
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['table_name', 'record_id']),
+            models.Index(fields=['timestamp']),
+        ]
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.table_name} #{self.record_id} ({self.action})"
+
 class UserActivityLog(models.Model):
     ACTION_TYPES = (
         ('login', 'تسجيل دخول'),
@@ -202,17 +231,4 @@ class UserActivityLog(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.action}"
 
-class AIInsightLog(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاريخ التقرير')
-    period_hours = models.IntegerField(default=6, verbose_name='الفترة (ساعات)')
-    total_orders = models.IntegerField(default=0)
-    total_items = models.IntegerField(default=0)
-    insights_data = models.JSONField(default=list, verbose_name='الرؤى والملاحظات')
-    
-    class Meta:
-        verbose_name = 'تقرير ذكي'
-        verbose_name_plural = 'التقارير الذكية'
-        ordering = ['-created_at']
 
-    def __str__(self):
-        return f"تقرير {self.created_at.strftime('%Y-%m-%d %H:%M')}"

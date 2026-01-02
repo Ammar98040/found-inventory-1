@@ -12,17 +12,26 @@ def admin_required(view_func):
     """تأكد من أن المستخدم مسؤول"""
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
+        # Check if it's an API or AJAX request
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.path.startswith('/api/')
+
         if not request.user.is_authenticated:
+            if is_ajax:
+                return JsonResponse({'error': 'يجب تسجيل الدخول أولاً', 'redirect': '/login/'}, status=401)
             messages.error(request, 'يجب تسجيل الدخول أولاً')
             return redirect('login')
         
         # التحقق من UserProfile
         if hasattr(request.user, 'user_profile'):
             if not request.user.user_profile.is_admin():
+                if is_ajax:
+                    return JsonResponse({'error': 'ليس لديك صلاحية للوصول إلى هذه الصفحة'}, status=403)
                 messages.error(request, 'ليس لديك صلاحية للوصول إلى هذه الصفحة')
                 return redirect('inventory_app:home')
         elif not request.user.is_superuser:
             # إذا لم يكن لديه profile، نتحقق من superuser فقط
+            if is_ajax:
+                return JsonResponse({'error': 'ليس لديك صلاحية للوصول إلى هذه الصفحة'}, status=403)
             messages.error(request, 'ليس لديك صلاحية للوصول إلى هذه الصفحة')
             return redirect('inventory_app:home')
         
@@ -34,7 +43,12 @@ def staff_required(view_func):
     """تأكد من أن المستخدم موظف أو مسؤول (أي مستخدم مسجل دخول)"""
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
+        # Check if it's an API or AJAX request
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.path.startswith('/api/')
+
         if not request.user.is_authenticated:
+            if is_ajax:
+                return JsonResponse({'error': 'يجب تسجيل الدخول أولاً', 'redirect': '/login/'}, status=401)
             messages.error(request, 'يجب تسجيل الدخول أولاً')
             return redirect('login')
         

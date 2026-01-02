@@ -675,7 +675,6 @@
                         <a href="{% url 'inventory_app:export_products_pdf' %}" class="btn btn--sm" target="_blank" style="background: #334155; color: white;">🧾 تصدير PDF</a>
                         <a href="{% url 'inventory_app:export_products_excel' %}" class="btn btn--sm" style="background: #0ea5e9; color: white;">📥 تصدير Excel</a>
                         <a href="{% url 'inventory_app:import_products_excel' %}" class="btn btn--sm" style="background: #22c55e; color: white;">📤 استيراد من Excel</a>
-                        <button class="btn btn--sm" onclick="resetAllQuantities()" style="background: #f59e0b; color: white;">↺ تصفير جميع الكميات</button>
                         <a href="{% url 'inventory_app:container_list' %}" class="btn btn--sm" style="background: #6366f1; color: white;">📋 إدارة الحاويات</a>
                         {% if selected_container %}
                             <a href="{% url 'inventory_app:products_list' %}" class="btn btn--sm" style="background: #ef4444; color: white;">✕ إلغاء الفلترة</a>
@@ -702,9 +701,8 @@
                              <a href="{% url 'inventory_app:export_products_pdf' %}" target="_blank">🧾 تصدير PDF</a>
                             <a href="{% url 'inventory_app:export_products_excel' %}">📥 تصدير Excel</a>
                             <a href="{% url 'inventory_app:import_products_excel' %}">📤 استيراد من Excel</a>
-                            <button onclick="resetAllQuantities()">↺ تصفير جميع الكميات</button>
                             <a href="{% url 'inventory_app:container_list' %}">📋 إدارة الحاويات</a>
-                             {% if selected_container %}
+                            {% if selected_container %}
                                 <a href="{% url 'inventory_app:products_list' %}" style="color: #ef4444;">✕ إلغاء الفلترة</a>
                             {% endif %}
                         </div>
@@ -1046,38 +1044,6 @@
             .catch(error => {
                 console.error('Error:', error);
                 alert('حدث خطأ أثناء حذف المنتجات');
-            });
-        }
-        
-        // تصفير جميع الكميات
-        function resetAllQuantities() {
-            if (!confirm('هل أنت متأكد من تصفير جميع الكميات في جميع المنتجات؟\n\nهذه العملية لا يمكن التراجع عنها!')) {
-                return;
-            }
-            const password = prompt('أدخل كلمة المرور للحماية:');
-            if (password === null) {
-                return;
-            }
-            fetch('/api/reset-all-quantities/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({ password })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(`✅ ${data.message}`);
-                    window.location.reload();
-                } else {
-                    alert('❌ خطأ: ' + (data.error || 'فشل العملية'));
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('حدث خطأ أثناء تصفير الكميات');
             });
         }
         
