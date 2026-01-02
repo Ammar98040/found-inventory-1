@@ -96,6 +96,51 @@
                 flex: 1 1 100%;
             }
         }
+
+        @media print {
+            body {
+                visibility: hidden;
+                margin: 0;
+                padding: 0;
+            }
+            .container, .container * {
+                visibility: visible;
+            }
+            .container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 10px;
+                transform: scale(0.85); /* تقليص الحجم ليتناسب مع الصفحة */
+                transform-origin: top left;
+            }
+            .no-print, .detail-actions, .btn {
+                display: none !important;
+            }
+            .order-info, .products-table {
+                box-shadow: none !important;
+                border: none !important;
+            }
+            /* Hide columns 6 and 7 (Before/After) - Adjusted for Image and Price columns */
+            th:nth-child(6), td:nth-child(6),
+            th:nth-child(7), td:nth-child(7) {
+                display: none;
+            }
+            th, td {
+                padding: 4px !important; /* تقليل الهوامش الداخلية */
+                font-size: 10pt; /* تصغير الخط */
+            }
+            img {
+                max-width: 40px !important; /* تصغير الصور في الطباعة */
+                max-height: 40px !important;
+            }
+            @page {
+                size: auto;
+                margin: 0.5cm;
+            }
+        }
     </style>
 </head>
 <body>
@@ -134,7 +179,7 @@
                 <span class="info-value">{{ order.created_at|date:"Y-m-d H:i" }}</span>
             </div>
             {% if order.notes %}
-            <div class="info-row">
+            <div class="info-row notes-row">
                 <span class="info-label">ملاحظات:</span>
                 <span class="info-value">{{ order.notes }}</span>
             </div>
@@ -158,6 +203,8 @@
                     <tr>
                         <th>#</th>
                         <th>رقم المنتج</th>
+                        <th>الصورة</th>
+                        <th>السعر</th>
                         <th>الكمية المسحوبة</th>
                         <th>الكمية قبل</th>
                         <th>الكمية بعد</th>
@@ -168,6 +215,14 @@
                     <tr>
                         <td>{{ forloop.counter }}</td>
                         <td><strong>{{ product.product_number }}</strong></td>
+                        <td>
+                            {% if product.image_url %}
+                            <img src="{{ product.image_url }}" alt="{{ product.product_number }}" style="max-width: 50px; max-height: 50px; object-fit: contain;">
+                            {% else %}
+                            <span style="color: #ccc;">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ product.price|default:0 }}</td>
                         <td>{{ product.quantity_taken }}</td>
                         <td>{{ product.old_quantity }}</td>
                         <td>{{ product.new_quantity }}</td>

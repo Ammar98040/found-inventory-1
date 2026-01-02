@@ -99,23 +99,47 @@ def confirm_products(request):
     # تجميع الطلبات لنفس المنتج لتفادي التكرارات
     aggregated_requests = {}
     invalid_items = []
+    
+    # التحقق من أن جميع المنتجات لها كمية أكبر من 0
+    zero_quantity_items = []
+    
     for item in products_list:
         try:
             number = str(item.get('number', '') or '').strip()
-            qty = int(item.get('quantity', 0))
+            # التأكد من تحويل الكمية إلى رقم صحيح، وإذا كانت فارغة تعتبر 0
+            qty_raw = item.get('quantity')
+            if qty_raw is None or qty_raw == '':
+                qty = 0
+            else:
+                qty = int(qty_raw)
         except (ValueError, TypeError):
             invalid_items.append(item)
             continue
+            
         if not number:
             invalid_items.append(item)
             continue
-        if qty < 0:
-            invalid_items.append(item)
+            
+        if qty <= 0:
+            zero_quantity_items.append(number)
             continue
+            
         aggregated_requests[number] = aggregated_requests.get(number, 0) + qty
 
     if invalid_items:
         return JsonResponse({'success': False, 'error': 'مدخلات غير صالحة', 'invalid_items': invalid_items}, status=400)
+        
+    if zero_quantity_items:
+        items_str = ", ".join(zero_quantity_items)
+        example_str = f"{zero_quantity_items[0]}:5" if zero_quantity_items else "رقم_المنتج:الكمية"
+        return JsonResponse({
+            'success': False, 
+            'error': f'يجب تحديد الكمية للمنتجات التالية: {items_str}. \nالرجاء البحث باستخدام الصيغة: {example_str}', 
+            'zero_quantity_items': zero_quantity_items
+        }, status=400)
+
+    if not aggregated_requests:
+         return JsonResponse({'success': False, 'error': 'لم يتم تحديد أي كميات للسحب'}, status=400)
 
     product_numbers = sorted(aggregated_requests.keys())
 
@@ -570,6 +594,41 @@ def get_secure_backup_detail(request, backup_id):
         'data': backup.backup_data,
         'hash': backup.hash_signature
     })
+
+
+@admin_required
+def export_secure_backup(request):
+    """تصدير سجلات الصندوق الأسود (SecureBackup)"""
+    # التحقق من صلاحية الوصول
+    if not request.session.get('secure_backup_access'):
+        return redirect('inventory_app:secure_backup_login')
+        
+    try:
+        # تصدير كل السجلات
+        backups = SecureBackup.objects.all().order_by('timestamp')
+        data = json.loads(serializers.serialize('json', backups))
+        
+        # إضافة معلومات وصفية
+        export_data = {
+            'meta': {
+                'type': 'secure_backup_export',
+                'date': datetime.now().isoformat(),
+                'count': len(data),
+                'description': 'تصدير كامل لسجلات الصندوق الأسود'
+            },
+            'records': data
+        }
+        
+        json_data = json.dumps(export_data, ensure_ascii=False, indent=2)
+        
+        filename = f'secure_backup_log_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+        response = HttpResponse(json_data, content_type='application/json')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+        
+    except Exception as e:
+        return HttpResponse(f"Error: {str(e)}", status=500)
+
 
 
 @admin_required
@@ -2097,20 +2156,40 @@ def export_order_pdf(request, order_id):
     from datetime import datetime
     try:
         order = get_object_or_404(Order, id=order_id)
-        now = datetime.now()
+        
+        # تحضير الصور
+        product_numbers = [p.get('product_number') for p in order.products_data if p.get('product_number')]
+        products = Product.objects.filter(product_number__in=product_numbers)
+        products_map = {p.product_number: p for p in products}
+
         rows_html = ''
         for idx, item in enumerate(order.products_data, start=1):
             num = item.get('product_number')
             taken = item.get('quantity_taken')
-            old_q = item.get('old_quantity')
-            new_q = item.get('new_quantity')
+            
+            img_html = '-'
+            price = 0
+            if num in products_map:
+                prod = products_map[num]
+                price = float(prod.price) if prod.price is not None else 0
+                if prod.image:
+                    try:
+                        import base64
+                        with open(prod.image.path, "rb") as image_file:
+                            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+                            img_html = f'<img src="data:image/jpeg;base64,{encoded_string}" style="max-width: 50px; max-height: 50px; object-fit: contain;">'
+                    except:
+                        pass
+                elif prod.image_url:
+                    img_html = f'<img src="{prod.image_url}" style="max-width: 50px; max-height: 50px; object-fit: contain;">'
+
             rows_html += f'''
             <tr>
                 <td>{idx}</td>
-                <td><strong>{num}</strong></td>
-                <td>{taken}</td>
-                <td>{old_q}</td>
-                <td>{new_q}</td>
+                <td style="text-align: center;"><strong>{num}</strong></td>
+                <td style="text-align: center;">{img_html}</td>
+                <td style="text-align: center;">{price}</td>
+                <td style="text-align: center;">{taken}</td>
             </tr>
             '''
 
@@ -2122,41 +2201,71 @@ def export_order_pdf(request, order_id):
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{ font-family: 'Segoe UI', 'Arial', 'Tahoma', sans-serif; font-size: 10pt; direction: rtl; padding: 20px; }}
-        .header {{ text-align: center; color: #667eea; font-size: 24pt; font-weight: bold; margin-bottom: 10px; }}
-        .info {{ text-align: center; margin-bottom: 20px; font-size: 11pt; color: #374151; }}
-        .summary {{ margin-top: 10px; text-align: center; color: #374151; font-size: 10pt; }}
-        .section-title {{ font-size: 14pt; font-weight: bold; color: #1e293b; margin: 15px 0; }}
-        table {{ width: 100%; border-collapse: collapse; margin: 0 auto; }}
-        th {{ background: #eef2ff; color: #1e293b; font-weight: bold; padding: 8px; border-bottom: 2px solid #e2e8f0; }}
-        td {{ padding: 8px; border-bottom: 1px solid #e2e8f0; }}
-        .meta {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0 20px; }}
-        .meta-item {{ background: #f8fafc; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; }}
-        .label {{ color: #64748b; font-weight: 600; }}
-        .value {{ color: #1e293b; font-weight: bold; }}
+        .header-title {{ text-align: center; color: #1e293b; font-size: 16pt; font-weight: bold; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }}
+        
+        .info-grid {{ 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 10px; 
+            margin-bottom: 20px; 
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }}
+        
+        .info-item {{ margin-bottom: 5px; }}
+        .label {{ color: #64748b; font-weight: bold; font-size: 9pt; margin-bottom: 2px; display: block; }}
+        .value {{ color: #0f172a; font-weight: bold; font-size: 11pt; }}
+        
+        table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+        th {{ background: #1e293b; color: white; font-weight: bold; padding: 8px; border: 1px solid #1e293b; font-size: 10pt; }}
+        td {{ padding: 6px; border: 1px solid #cbd5e1; font-size: 10pt; }}
+        tr:nth-child(even) {{ background-color: #f1f5f9; }}
+        
+        @page {{
+            margin: 0.5cm;
+            size: A4;
+        }}
     </style>
     <title>طلبية {order.order_number}</title>
-    </head>
+</head>
 <body>
-    <div class="header">تفاصيل الطلبية</div>
-    <div class="info">رقم الطلبية: <span style="font-family: monospace;">{order.order_number}</span></div>
-    <div class="summary">تاريخ التقرير: {now.strftime('%Y-%m-%d %H:%M')}</div>
-    <div class="meta">
-        <div class="meta-item"><div class="label">اسم المستلم</div><div class="value">{order.recipient_name or '-'}
-        </div></div>
-        <div class="meta-item"><div class="label">عدد المنتجات</div><div class="value">{order.total_products}</div></div>
-        <div class="meta-item"><div class="label">إجمالي الكميات المسحوبة</div><div class="value">{order.total_quantities}</div></div>
-        <div class="meta-item"><div class="label">تاريخ السحب</div><div class="value">{order.created_at.strftime('%Y-%m-%d %H:%M')}</div></div>
+    <div class="header-title">تفاصيل الطلبية</div>
+    
+    <div class="info-grid">
+        <div class="info-item">
+            <span class="label">اسم المستلم:</span>
+            <span class="value">{order.recipient_name or '-'}</span>
+        </div>
+        <div class="info-item">
+            <span class="label">رقم الطلبية:</span>
+            <span class="value" style="font-family: monospace;">{order.order_number}</span>
+        </div>
+        <div class="info-item">
+            <span class="label">عدد المنتجات:</span>
+            <span class="value">{order.total_products} منتج</span>
+        </div>
+        <div class="info-item">
+            <span class="label">إجمالي الكميات المسحوبة:</span>
+            <span class="value">{order.total_quantities} حبة</span>
+        </div>
+        <div class="info-item" style="grid-column: span 2;">
+            <span class="label">تاريخ وساعة السحب:</span>
+            <span class="value">{order.created_at.strftime('%Y-%m-%d %H:%M')}</span>
+        </div>
     </div>
-    {f'<div style="margin: 10px 0; color: #374151;"><span class="label">ملاحظات:</span> <span class="value">{order.notes}</span></div>' if getattr(order, 'notes', None) else ''}
-    <div class="section-title">تفاصيل المنتجات</div>
+
+    <div style="font-weight: bold; font-size: 14pt; margin-bottom: 10px; color: #1e293b;">المنتجات في هذه الطلبية:</div>
+    
     <table>
         <thead>
             <tr>
-                <th>#</th>
-                <th>رقم المنتج</th>
-                <th>الكمية المسحوبة</th>
-                <th>الكمية قبل</th>
-                <th>الكمية بعد</th>
+                <th style="width: 10%;">#</th>
+                <th style="width: 30%;">رقم المنتج</th>
+                <th style="width: 20%;">الصورة</th>
+                <th style="width: 20%;">السعر</th>
+                <th style="width: 20%;">الكمية المسحوبة</th>
             </tr>
         </thead>
         <tbody>
@@ -2172,7 +2281,7 @@ def export_order_pdf(request, order_id):
             page.set_content(html_content)
             pdf_bytes = page.pdf(
                 format='A4',
-                landscape=False,
+                print_background=True,
                 margin={'top': '1cm', 'right': '1cm', 'bottom': '1cm', 'left': '1cm'}
             )
             browser.close()
@@ -3223,6 +3332,25 @@ def order_detail(request, order_id):
             if p_num == product_query:
                 filtered_products.append(p)
         order.products_data = filtered_products
+
+    # إثراء البيانات بالصور والسعر من قاعدة البيانات
+    product_numbers = [p.get('product_number') for p in order.products_data if p.get('product_number')]
+    products = Product.objects.filter(product_number__in=product_numbers)
+    products_map = {p.product_number: p for p in products}
+    
+    for p in order.products_data:
+        p_num = p.get('product_number')
+        if p_num in products_map:
+            product = products_map[p_num]
+            p['price'] = float(product.price) if product.price is not None else 0
+            if product.image:
+                p['image_url'] = product.image.url
+            elif product.image_url:
+                p['image_url'] = product.image_url
+            else:
+                p['image_url'] = None
+        else:
+             p['price'] = 0
 
     return render(request, 'inventory_app/order_detail.html', {
         'order': order

@@ -11,138 +11,50 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.SeparateDatabaseAndState(
-            database_operations=[
-                migrations.RunSQL(
-                    sql=(
-                        "ALTER TABLE inventory_app_product ADD COLUMN IF NOT EXISTS barcode varchar(100);"
-                    ),
-                    reverse_sql=(
-                        "ALTER TABLE inventory_app_product DROP COLUMN IF EXISTS barcode;"
-                    ),
-                ),
-                migrations.RunSQL(
-                    sql=(
-                        "ALTER TABLE inventory_app_product ADD COLUMN IF NOT EXISTS dozens_per_carton integer NOT NULL DEFAULT 1;"
-                    ),
-                    reverse_sql=(
-                        "ALTER TABLE inventory_app_product DROP COLUMN IF EXISTS dozens_per_carton;"
-                    ),
-                ),
-                migrations.RunSQL(
-                    sql=(
-                        "ALTER TABLE inventory_app_product ADD COLUMN IF NOT EXISTS image_url varchar(500);"
-                    ),
-                    reverse_sql=(
-                        "ALTER TABLE inventory_app_product DROP COLUMN IF EXISTS image_url;"
-                    ),
-                ),
-                migrations.RunSQL(
-                    sql=(
-                        "ALTER TABLE inventory_app_product ADD COLUMN IF NOT EXISTS min_stock_threshold integer NOT NULL DEFAULT 0;"
-                    ),
-                    reverse_sql=(
-                        "ALTER TABLE inventory_app_product DROP COLUMN IF EXISTS min_stock_threshold;"
-                    ),
-                ),
-                migrations.RunSQL(
-                    sql=(
-                        "ALTER TABLE inventory_app_product ADD COLUMN IF NOT EXISTS pcs_per_dozen integer NOT NULL DEFAULT 12;"
-                    ),
-                    reverse_sql=(
-                        "ALTER TABLE inventory_app_product DROP COLUMN IF EXISTS pcs_per_dozen;"
-                    ),
-                ),
-                migrations.RunSQL(
-                    sql=(
-                        "ALTER TABLE inventory_app_product ADD COLUMN IF NOT EXISTS price numeric(10,2);"
-                    ),
-                    reverse_sql=(
-                        "ALTER TABLE inventory_app_product DROP COLUMN IF EXISTS price;"
-                    ),
-                ),
-                migrations.RunSQL(
-                    sql=(
-                        "ALTER TABLE inventory_app_product ADD COLUMN IF NOT EXISTS store_quantity integer NOT NULL DEFAULT 0;"
-                    ),
-                    reverse_sql=(
-                        "ALTER TABLE inventory_app_product DROP COLUMN IF EXISTS store_quantity;"
-                    ),
-                ),
-                migrations.RunSQL(
-                    sql=(
-                        "ALTER TABLE inventory_app_product ADD COLUMN IF NOT EXISTS warehouse_quantity integer NOT NULL DEFAULT 0;"
-                    ),
-                    reverse_sql=(
-                        "ALTER TABLE inventory_app_product DROP COLUMN IF EXISTS warehouse_quantity;"
-                    ),
-                ),
-            ],
-            state_operations=[
-                migrations.AddField(
-                    model_name='product',
-                    name='barcode',
-                    field=models.CharField(blank=True, max_length=100, null=True, verbose_name='الباركود'),
-                ),
-                migrations.AddField(
-                    model_name='product',
-                    name='dozens_per_carton',
-                    field=models.IntegerField(default=1, validators=[django.core.validators.MinValueValidator(1)], verbose_name='عدد الدرزنات في الكرتون'),
-                ),
-                migrations.AddField(
-                    model_name='product',
-                    name='image_url',
-                    field=models.CharField(blank=True, max_length=500, null=True, verbose_name='رابط الصورة'),
-                ),
-                migrations.AddField(
-                    model_name='product',
-                    name='min_stock_threshold',
-                    field=models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='الحد الأدنى للمخزون'),
-                ),
-                migrations.AddField(
-                    model_name='product',
-                    name='pcs_per_dozen',
-                    field=models.IntegerField(default=12, validators=[django.core.validators.MinValueValidator(1)], verbose_name='عدد الحبات في الدرزن'),
-                ),
-                migrations.AddField(
-                    model_name='product',
-                    name='price',
-                    field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True, verbose_name='السعر'),
-                ),
-                migrations.AddField(
-                    model_name='product',
-                    name='store_quantity',
-                    field=models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='كمية المحل'),
-                ),
-                migrations.AddField(
-                    model_name='product',
-                    name='warehouse_quantity',
-                    field=models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='كمية المستودع'),
-                ),
-            ],
+        migrations.AddField(
+            model_name='product',
+            name='barcode',
+            field=models.CharField(blank=True, max_length=100, null=True, verbose_name='الباركود'),
         ),
-        migrations.SeparateDatabaseAndState(
-            database_operations=[
-                migrations.RunSQL(
-                    sql=(
-                        "DROP TABLE IF EXISTS inventory_app_personimage CASCADE;"
-                    ),
-                    reverse_sql="SELECT 1;",
-                ),
-                migrations.RunSQL(
-                    sql=(
-                        "DROP TABLE IF EXISTS inventory_app_person CASCADE;"
-                    ),
-                    reverse_sql="SELECT 1;",
-                ),
-            ],
-            state_operations=[
-                migrations.DeleteModel(
-                    name='Person',
-                ),
-                migrations.DeleteModel(
-                    name='PersonImage',
-                ),
-            ],
+        migrations.AddField(
+            model_name='product',
+            name='dozens_per_carton',
+            field=models.IntegerField(default=1, validators=[django.core.validators.MinValueValidator(1)], verbose_name='عدد الدرزنات في الكرتون'),
+        ),
+        migrations.AddField(
+            model_name='product',
+            name='image_url',
+            field=models.CharField(blank=True, max_length=500, null=True, verbose_name='رابط الصورة'),
+        ),
+        migrations.AddField(
+            model_name='product',
+            name='min_stock_threshold',
+            field=models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='الحد الأدنى للمخزون'),
+        ),
+        migrations.AddField(
+            model_name='product',
+            name='pcs_per_dozen',
+            field=models.IntegerField(default=12, validators=[django.core.validators.MinValueValidator(1)], verbose_name='عدد الحبات في الدرزن'),
+        ),
+        migrations.AddField(
+            model_name='product',
+            name='price',
+            field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True, verbose_name='السعر'),
+        ),
+        migrations.AddField(
+            model_name='product',
+            name='store_quantity',
+            field=models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='كمية المحل'),
+        ),
+        migrations.AddField(
+            model_name='product',
+            name='warehouse_quantity',
+            field=models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='كمية المستودع'),
+        ),
+        migrations.DeleteModel(
+            name='Person',
+        ),
+        migrations.DeleteModel(
+            name='PersonImage',
         ),
     ]

@@ -117,6 +117,7 @@ urlpatterns = [
     # النسخ الاحتياطي الآمن (الصندوق الأسود)
     path('secure-backup/login/', views.secure_backup_login, name='secure_backup_login'),
     path('secure-backup/', views.secure_backup_dashboard, name='secure_backup_dashboard'),
+    path('api/secure-backup/export/', views.export_secure_backup, name='export_secure_backup'),
     path('api/secure-backup/<int:backup_id>/', views.get_secure_backup_detail, name='get_secure_backup_detail'),
 
     # أدوات الجودة والتحليل

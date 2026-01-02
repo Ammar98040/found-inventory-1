@@ -71,10 +71,6 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-**أو** يمكنك استخدام المستخدم المدمج:
-- **اسم المستخدم:** قلب العرب
-- **كلمة المرور:** Thepest**1
-
 ### 6. تشغيل الخادم
 
 ```bash

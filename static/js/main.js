@@ -778,7 +778,7 @@ function handleProductCheck(index, productNumber, availableQuantity, requestedQu
         if (!selectedProducts.find(p => p.number === productNumber)) {
             selectedProducts.push({
                 number: productNumber,
-                quantity: requestedQuantity || availableQuantity,
+                quantity: requestedQuantity || 0,
                 index: index
             });
         }

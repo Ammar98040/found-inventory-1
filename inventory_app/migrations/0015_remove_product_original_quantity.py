@@ -8,24 +8,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.SeparateDatabaseAndState(
-            database_operations=[
-                migrations.RunSQL(
-                    sql=(
-                        "ALTER TABLE inventory_app_product "
-                        "DROP COLUMN IF EXISTS original_quantity;"
-                    ),
-                    reverse_sql=(
-                        "ALTER TABLE inventory_app_product "
-                        "ADD COLUMN original_quantity integer NOT NULL DEFAULT 0;"
-                    ),
-                ),
-            ],
-            state_operations=[
-                migrations.RemoveField(
-                    model_name='product',
-                    name='original_quantity',
-                ),
-            ],
+        migrations.RemoveField(
+            model_name='product',
+            name='original_quantity',
         ),
     ]

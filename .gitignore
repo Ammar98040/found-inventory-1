@@ -33,11 +33,18 @@ logs/
 .env.local
 *.env
 
+# Database Backups
+*.sql
+*.dump
+*.sqlite3
+
 # Files to NOT upload
 LOGIN_INFO.txt
-روابط_النظام.txt
+روا_ط_النظام.txt
 start.bat
 start.sh
+import_sql_to_vps.sh
+import_to_vps.sh
 
 # System files
 .DS_Store
